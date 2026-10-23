@@ -1,0 +1,2293 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>XMAX 300 - Smart Fuel & Trip Planner</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#24477A">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="XMAX น้ำมัน">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Anuphan (UI ภาษาไทย) + K2D (ตัวเลขมิเตอร์) -->
+    <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=K2D:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Anuphan', 'system-ui', 'sans-serif'],
+                        digital: ['K2D', 'Anuphan', 'sans-serif'],
+                    },
+                    colors: {
+                        // Strict 60-30-10 Color System
+                        // 60%: Clean White & Off-White
+                        surface: {
+                            white: '#FFFFFF',
+                            bg: '#F8FAFC',
+                            subtle: '#F1F5F9',
+                            border: '#E2E8F0'
+                        },
+                        // 30%: Deep Navy Blue (สีน้ำเงินกรมท่า)
+                        navy: {
+                            950: '#1B3558',
+                            900: '#24477A',
+                            800: '#33598F',
+                            700: '#4A6A9A',
+                            500: '#64748B'
+                        },
+                        // 10%: Warm Gold / Amber (แรงบันดาลใจจาก XMAX Tech MAX / Öhlins)
+                        gold: {
+                            50: '#FFFBEB',
+                            100: '#FEF3C7',
+                            500: '#F59E0B',
+                            600: '#D97706',
+                            700: '#B45309'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        html { scroll-behavior: smooth; scroll-padding-top: 9rem; }
+
+        /* มือถือ/แท็บเล็ต: เลื่อนแล้วล็อคทีละหัวข้อ ทั้งขาลงและขึ้น */
+        @media (max-width: 1023px) {
+            html { scroll-snap-type: y proximity; }
+            .snap-item {
+                scroll-snap-align: start;
+            }
+        }
+
+        body {
+            background-color: #F8FAFC;
+            color: #1E293B;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        /* ตัวเลขใช้ฟอนต์ความกว้างคงที่ ตัวเลขไม่ขยับเวลาค่าเปลี่ยน */
+        .font-digital {
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Anuphan', sans-serif;
+            letter-spacing: 0;
+        }
+
+        /* ซ่อนลูกศรเพิ่ม/ลดของช่องกรอกตัวเลข ไม่ให้ทับหน่วย */
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        /* ลูกศรวิ่งจากจุดเริ่มต้นไปปลายทาง */
+        @keyframes driveAlong {
+            0%   { left: 0; opacity: 0; }
+            12%  { opacity: 1; }
+            88%  { opacity: 1; }
+            100% { left: calc(100% - 18px); opacity: 0; }
+        }
+        .route-car { animation: driveAlong 2.4s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+            .route-car { animation: none; left: calc(50% - 9px); }
+        }
+
+        /* Blinking animation for Trip F (Low Fuel Warning) */
+        @keyframes pulseGold {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.35;
+                transform: scale(0.98);
+            }
+        }
+
+        .blink-warning {
+            animation: pulseGold 1.1s infinite ease-in-out;
+        }
+
+        /* Custom Range Slider strictly in Navy & Gold */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #E2E8F0;
+            border-radius: 999px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #D97706;
+            border: 3px solid #FFFFFF;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.35);
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -8px;
+            transition: transform 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            background: #F59E0B;
+        }
+
+        /* Smooth transitions for fuel gauge bars */
+        .gauge-seg {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    
+        /* ปุ่มเล็กสำหรับเลื่อน/ลบจุดแวะ */
+        .stop-ctl {
+            width: 2.25rem; height: 2.25rem;
+            border: 1px solid #E2E8F0; border-radius: 0.5rem;
+            background: #FFFFFF; color: #33598F; font-weight: 700; line-height: 1;
+        }
+        .stop-ctl:hover:not(:disabled) { border-color: #4A6A9A; color: #1B3558; }
+        .stop-ctl:disabled { opacity: 0.35; cursor: default; }
+    
+        /* มือถือ: เว้นขอบล่าง/ข้างตามรอยบาก (iPhone) เมื่อเปิดเป็นแอป */
+        #stickyVerdict { padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)); }
+        body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+    </style>
+</head>
+<body class="min-h-screen font-sans pb-24 sm:pb-16 selection:bg-gold-500 selection:text-white">
+
+    <!-- TOP NAVIGATION BAR (30% Navy Blue) -->
+    <header class="bg-navy-900 text-surface-white border-b border-navy-700">
+        <div class="max-w-5xl mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-lg sm:text-lg tracking-wide text-surface-white">YAMAHA XMAX 300</h1>
+                        <span class="text-sm text-surface-subtle/70 font-digital">
+                            ถัง 13.0 L
+                        </span>
+                    </div>
+                    <p class="text-sm text-surface-subtle/80">คำนวณน้ำมันและวางแผนทริป</p>
+                </div>
+            </div>
+
+            
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 pt-0 pb-6 space-y-6 [&>nav+*]:mt-6">
+
+        <!-- แถบติดบน: จุดเริ่มต้น → ปลายทาง + ขั้นตอน 1-5 (เห็นตลอดตอนเลื่อน) -->
+        <div id="stickyTop" class="sticky top-0 z-40 -mx-4 px-4 py-2.5 bg-surface-bg/95 backdrop-blur border-b border-surface-border space-y-2.5">
+            <div class="flex items-center gap-3 bg-navy-900 text-surface-white rounded-lg px-3 py-2">
+                <button onclick="detectGPSLocation()" class="min-w-0 flex-1 text-left" title="จุดเริ่มต้น (แตะเพื่ออัปเดตพิกัด GPS)">
+                    <div class="hidden sm:block text-xs text-surface-subtle/70 leading-tight">จุดเริ่มต้น</div>
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <svg class="shrink-0" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="#F59E0B" stroke-width="2.2"/></svg>
+                        <span id="headerGpsText" class="text-sm font-medium truncate">พิกัด: มหาสารคาม / ขอนแก่น</span>
+                    </div>
+                </button>
+
+                <div class="route-track relative w-10 sm:flex-1 sm:max-w-[9rem] h-5 shrink-0" aria-hidden="true">
+                    <div class="absolute left-0 right-0 top-1/2 border-t-2 border-dashed border-navy-700"></div>
+                    <svg class="route-car absolute top-0 left-0" width="18" height="20" viewBox="0 0 18 20">
+                        <path d="M3 3 L15 10 L3 17 L6 10 Z" fill="#F59E0B"/>
+                    </svg>
+                </div>
+
+                <div class="min-w-0 flex-1 text-right" title="ปลายทาง">
+                    <div class="hidden sm:block text-xs text-surface-subtle/70 leading-tight">ปลายทาง</div>
+                    <div class="flex items-center justify-end gap-1.5 min-w-0">
+                        <span id="headerDestText" class="text-sm font-medium truncate">บ้านโนนหัน</span>
+                        <svg class="shrink-0" width="11" height="14" viewBox="0 0 10 12" aria-hidden="true"><path d="M5 0C2.5 0 .5 2 .5 4.5 .5 8 5 12 5 12s4.5-4 4.5-7.5C9.5 2 7.5 0 5 0z" fill="#F59E0B"/><circle cx="5" cy="4.5" r="1.6" fill="#24477A"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <nav aria-label="ขั้นตอน" class="-mx-4 px-4 overflow-x-auto">
+                <ol class="flex items-center gap-2 min-w-max text-sm font-medium">
+                <li><a href="#step1" data-step="step1" class="step-chip flex items-center gap-2 px-3 py-2 rounded-lg border border-surface-border bg-surface-white text-navy-700 transition"><span class="font-digital font-bold text-gold-700">1</span>ขีดน้ำมัน</a></li>
+                <li><a href="#step2" data-step="step2" class="step-chip flex items-center gap-2 px-3 py-2 rounded-lg border border-surface-border bg-surface-white text-navy-700 transition"><span class="font-digital font-bold text-gold-700">2</span>เติมเงิน</a></li>
+                <li><a href="#step3" data-step="step3" class="step-chip flex items-center gap-2 px-3 py-2 rounded-lg border border-surface-border bg-surface-white text-navy-700 transition"><span class="font-digital font-bold text-gold-700">3</span>อัตราสิ้นเปลือง</a></li>
+                <li><a href="#step4" data-step="step4" class="step-chip flex items-center gap-2 px-3 py-2 rounded-lg border border-surface-border bg-surface-white text-navy-700 transition"><span class="font-digital font-bold text-gold-700">4</span>เส้นทาง</a></li>
+                <li><a href="#step5" data-step="step5" class="step-chip flex items-center gap-2 px-3 py-2 rounded-lg border border-surface-border bg-surface-white text-navy-700 transition"><span class="font-digital font-bold text-gold-700">5</span>สรุปผล</a></li>
+            </ol>
+            </nav>
+        </div>
+
+        <!-- DIGITAL INSTRUMENT CLUSTER (60% White card, navy text, 10% Gold Active Bars) -->
+        <section id="meter" class="snap-item bg-surface-white text-navy-900 rounded-xl p-4 sm:p-6 border border-surface-border">
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-4 mb-5 border-b border-surface-border">
+                <div class="flex items-center gap-2">
+                    <svg class="text-gold-600" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/></svg>
+                    <h2 class="font-bold text-lg sm:text-lg tracking-wide">มิเตอร์น้ำมัน 6 ขีด</h2>
+                </div>
+                <div class="flex items-center gap-3 text-sm">
+                    <span class="px-2.5 py-1 rounded-md bg-surface-subtle border border-surface-border text-navy-700">
+                        อัตราสิ้นเปลืองที่ใช้คำนวณ: <strong id="meterKmlBadge" class="text-gold-700 font-digital">31.4</strong> กม./ลิตร
+                    </span>
+                </div>
+            </div>
+
+            <!-- 3-Stage Gauge Comparison Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                <!-- STAGE 1: CURRENT TANK -->
+                <div class="bg-surface-subtle rounded-xl p-4 border border-surface-border flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-navy-700 uppercase tracking-wider">1. น้ำมันเดิมในถัง</span>
+                        <span id="stage1StatusBadge" class="text-xs font-bold px-2 py-0.5 rounded bg-gold-500 text-navy-950">
+                            ไฟกะพริบ (Trip F)
+                        </span>
+                    </div>
+
+                    <!-- 6-Bar Visual Meter (Clickable) -->
+                    <div class="my-3">
+                        <div class="flex items-center justify-between text-xs font-digital text-navy-500 mb-1 px-0.5">
+                            <span>E</span>
+                            <span>1/2</span>
+                            <span>F</span>
+                        </div>
+                        <div id="gaugeStage1" class="grid grid-cols-6 gap-1.5 h-7 p-1 bg-surface-white rounded-lg border border-surface-border">
+                            <!-- Bars rendered by JS -->
+                        </div>
+                    </div>
+
+                    <div class="flex items-baseline justify-between pt-2 border-t border-surface-border">
+                        <div>
+                            <div class="text-xs text-navy-500">ปริมาณในถัง</div>
+                            <div class="font-digital font-bold text-xl text-navy-900">
+                                <span id="stage1Liters">1.50</span> <span class="text-sm font-sans font-normal text-navy-500">ลิตร</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-navy-500">วิ่งได้ประมาณ</div>
+                            <div class="font-digital font-bold text-xl text-gold-700">
+                                <span id="stage1Range">47</span> <span class="text-sm font-sans font-normal text-navy-500">กม.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STAGE 2: AFTER REFUEL -->
+                <div class="bg-surface-subtle rounded-xl p-4 border border-surface-border flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-navy-700 uppercase tracking-wider">2. หลังเติมน้ำมันเพิ่ม</span>
+                        <span id="stage2StatusBadge" class="text-xs font-bold px-2 py-0.5 rounded bg-navy-900 text-surface-white">
+                            +300 ฿ (4 ขีด)
+                        </span>
+                    </div>
+
+                    <div class="my-3">
+                        <div class="flex items-center justify-between text-xs font-digital text-navy-500 mb-1 px-0.5">
+                            <span>E</span>
+                            <span>1/2</span>
+                            <span>F</span>
+                        </div>
+                        <div id="gaugeStage2" class="grid grid-cols-6 gap-1.5 h-7 p-1 bg-surface-white rounded-lg border border-surface-border">
+                            <!-- Bars rendered by JS -->
+                        </div>
+                    </div>
+
+                    <div class="flex items-baseline justify-between pt-2 border-t border-surface-border">
+                        <div>
+                            <div class="text-xs text-navy-500">น้ำมันรวมในถัง</div>
+                            <div class="font-digital font-bold text-xl text-navy-900">
+                                <span id="stage2Liters">8.63</span> <span class="text-sm font-sans font-normal text-navy-500">ลิตร</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-navy-500">ระยะทางวิ่งได้รวม</div>
+                            <div class="font-digital font-bold text-xl text-gold-700">
+                                <span id="stage2Range">271</span> <span class="text-sm font-sans font-normal text-navy-500">กม.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STAGE 3: AT DESTINATION -->
+                <div class="bg-surface-subtle rounded-xl p-4 border border-surface-border flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-navy-700 uppercase tracking-wider">3. เมื่อถึงปลายทาง</span>
+                        <span id="stage3StatusBadge" class="text-xs font-bold px-2 py-0.5 rounded bg-gold-500 text-navy-950">
+                            เหลือ 2 ขีด
+                        </span>
+                    </div>
+
+                    <div class="my-3">
+                        <div class="flex items-center justify-between text-xs font-digital text-navy-500 mb-1 px-0.5">
+                            <span>E</span>
+                            <span>1/2</span>
+                            <span>F</span>
+                        </div>
+                        <div id="gaugeStage3" class="grid grid-cols-6 gap-1.5 h-7 p-1 bg-surface-white rounded-lg border border-surface-border">
+                            <!-- Bars rendered by JS -->
+                        </div>
+                    </div>
+
+                    <div class="flex items-baseline justify-between pt-2 border-t border-surface-border">
+                        <div>
+                            <div class="text-xs text-navy-500">คงเหลือปลายทาง</div>
+                            <div class="font-digital font-bold text-xl text-navy-900">
+                                <span id="stage3Liters">3.64</span> <span class="text-sm font-sans font-normal text-navy-500">ลิตร</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-navy-500">วิ่งต่อได้อีก</div>
+                            <div class="font-digital font-bold text-xl text-gold-700">
+                                <span id="stage3Range">114</span> <span class="text-sm font-sans font-normal text-navy-500">กม.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- MAIN WORKSPACE GRID (60% Clean White Cards with 30% Navy Borders/Text & 10% Gold Highlights) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- LEFT COLUMN (Sections 1, 2, 3) -->
+            <div class="lg:col-span-7 space-y-6">
+
+                <!-- SECTION 1: SELECT CURRENT FUEL BARS ONLY -->
+                <section id="step1" class="snap-item bg-surface-white rounded-xl p-4 sm:p-6 border border-surface-border">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2.5">
+                            <span class="font-digital font-bold text-base text-gold-700 w-6">1</span>
+                            <div>
+                                <h3 class="font-bold text-navy-900 text-lg sm:text-lg">สถานะน้ำมันในถังตอนนี้ (เลือกจำนวนขีด)</h3>
+                                <p class="text-sm text-navy-500">กดเลือกจำนวนขีดตามหน้าปัดรถของคุณ ระบบจะคำนวณปริมาณลิตรและระยะทางให้อัตโนมัติ</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Bar Selector Grid -->
+                    <div id="barSelectorGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <!-- Populated dynamically by JS so km range updates live when km/L changes -->
+                    </div>
+
+                    <!-- Selected Bar Quick Info Banner -->
+                    <div class="mt-4 bg-surface-subtle rounded-xl p-3.5 border border-surface-border flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <svg class="text-gold-700" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg>
+                            <span class="text-sm sm:text-base font-medium text-navy-800">
+                                สถานะที่เลือก: <strong id="sec1SelectedLabel" class="text-navy-900 font-bold">ไฟกะพริบ (Trip F)</strong>
+                                (~<span id="sec1SelectedLiters" class="font-digital font-bold text-navy-900">1.5</span> ลิตร)
+                            </span>
+                        </div>
+                        <div class="text-sm sm:text-base font-semibold text-navy-900 bg-surface-white px-3 py-1 rounded-lg border border-surface-border">
+                            วิ่งต่อได้ประมาณ <span id="sec1SelectedRange" class="font-digital font-bold text-gold-700">47</span> กม.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 2: GPS AUTO FUEL PRICE & REFUEL CALCULATOR -->
+                <section id="step2" class="snap-item bg-surface-white rounded-xl p-4 sm:p-6 border border-surface-border">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <div class="flex items-center gap-2.5">
+                            <span class="font-digital font-bold text-base text-gold-700 w-6">2</span>
+                            <div>
+                                <h3 class="font-bold text-navy-900 text-lg sm:text-lg">ราคาน้ำมันตามพิกัด GPS & คำนวณเงินที่เติม</h3>
+                                <p class="text-sm text-navy-500">อัปเดตราคาหน้าปั๊มรวมภาษี อบจ. อัตโนมัติตามพื้นที่ของคุณ</p>
+                            </div>
+                        </div>
+
+                        <button onclick="detectGPSLocation()" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg bg-surface-white border border-navy-900 text-navy-900 hover:bg-navy-900/5 transition">
+                            <svg class="text-gold-700" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg>
+                            <span>ดึงพิกัด GPS & อัปเดตราคา</span>
+                        </button>
+                    </div>
+
+                    <!-- GPS Location & Area Selector Bar -->
+                    <div class="bg-surface-subtle rounded-xl p-3.5 border border-surface-border mb-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                            <div class="flex items-center gap-2 text-sm font-semibold text-navy-800">
+                                <svg class="text-gold-700" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                <span>พื้นที่ปัจจุบัน: <strong id="gpsRegionName" class="text-navy-900">จ.มหาสารคาม (ม.ใหม่ / ท่าขอนยาง)</strong></span>
+                            </div>
+                            <span id="gpsTaxNote" class="text-xs font-medium px-2 py-0.5 rounded bg-surface-white text-navy-700 border border-surface-border">
+                                รวมภาษี อบจ. +0.05 บาท/ลิตร แล้ว
+                            </span>
+                        </div>
+
+                        <!-- Quick Province Switcher (in case GPS permission is blocked or planning ahead) -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                            <button onclick="setProvincePricing('mahasarakham')" id="provBtn_mahasarakham" class="prov-btn py-2.5 sm:py-1.5 px-2 rounded-lg font-medium border transition">
+                                มหาสารคาม (+0.05฿)
+                            </button>
+                            <button onclick="setProvincePricing('khonkaen')" id="provBtn_khonkaen" class="prov-btn py-2.5 sm:py-1.5 px-2 rounded-lg font-medium border transition">
+                                ขอนแก่น / ชุมแพ (+0.05฿)
+                            </button>
+                            <button onclick="setProvincePricing('bangkok')" id="provBtn_bangkok" class="prov-btn py-2.5 sm:py-1.5 px-2 rounded-lg font-medium border transition">
+                                ราคากลาง กทม. (+0.00฿)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Fuel Type Cards -->
+                    <label class="block text-sm font-semibold text-navy-700 uppercase tracking-wider mb-2">เลือกชนิดน้ำมันที่เติม:</label>
+                    <div id="fuelTypeGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <!-- Refuel Amount Input & Explicit Calculate Button -->
+                    <div class="bg-surface-subtle rounded-xl p-4 border border-surface-border">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <label for="refuelBahtInput" class="text-base font-bold text-navy-900">
+                                ระบุจำนวนเงินที่ต้องการเติม (บาท)
+                            </label>
+                            <span class="text-sm text-navy-500">
+                                ราคาที่ใช้คำนวณ: <strong id="activePricePerLiterDisplay" class="font-digital text-navy-900">42.09</strong> บาท/ลิตร
+                            </span>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-2.5 mb-3">
+                            <div class="relative flex-1">
+                                <input
+                                    type="number"
+                                    id="refuelBahtInput"
+                                    value="300"
+                                    min="0"
+                                    max="1000"
+                                    step="10"
+                                    oninput="handleBahtInputChange(this.value)"
+                                    class="w-full bg-surface-white text-navy-900 font-digital font-bold text-xl pl-4 pr-24 py-2.5 rounded-xl border-2 border-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-500"
+                                    placeholder="เช่น 100, 150, 300"
+                                >
+                                <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-navy-500">บาท (THB)</span>
+                            </div>
+                            <button
+                                onclick="triggerRefuelCalculation()"
+                                class="bg-navy-900 hover:bg-navy-800 active:scale-[0.99] text-surface-white font-bold px-5 py-2.5 rounded-lg transition flex items-center justify-center gap-2"
+                            >
+                                <svg class="" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><path d="M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></svg>
+                                <span>คำนวณน้ำมัน</span>
+                            </button>
+                        </div>
+
+                        <!-- Quick Top-up Preset Buttons -->
+                        <div class="flex flex-wrap gap-1.5">
+                            <button onclick="setRefuelBaht(0)" class="baht-preset-btn text-sm font-semibold px-3 py-2 sm:py-1.5 rounded-lg border transition">ไม่เติม (0฿)</button>
+                            <button onclick="setRefuelBaht(100)" class="baht-preset-btn text-sm font-semibold px-3 py-2 sm:py-1.5 rounded-lg border transition">+100฿</button>
+                            <button onclick="setRefuelBaht(150)" class="baht-preset-btn text-sm font-semibold px-3 py-2 sm:py-1.5 rounded-lg border transition">+150฿</button>
+                            <button onclick="setRefuelBaht(200)" class="baht-preset-btn text-sm font-semibold px-3 py-2 sm:py-1.5 rounded-lg border transition">+200฿</button>
+                            <button onclick="setRefuelBaht(300)" class="baht-preset-btn text-sm font-semibold px-3 py-2 sm:py-1.5 rounded-lg border transition">+300฿</button>
+                            <button onclick="setRefuelBaht(400)" class="baht-preset-btn text-sm font-semibold px-3 py-2 sm:py-1.5 rounded-lg border transition">+400฿</button>
+                            <button onclick="fillFullTank()" class="w-full sm:w-auto sm:ml-auto justify-center mt-1 sm:mt-0 text-sm font-bold px-3.5 py-2.5 sm:py-1.5 rounded-lg bg-surface-white border border-navy-900 text-navy-900 hover:bg-navy-900/5 transition flex items-center gap-2">
+                                <svg class="" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg>
+                                <span id="fullTankBtnLabel">เติมเต็มถัง (~484฿)</span>
+                            </button>
+                        </div>
+
+                        <!-- Refuel Calculation Instant Result Box -->
+                        <div class="mt-4 pt-3.5 border-t border-surface-border grid grid-cols-1 sm:grid-cols-3 gap-2 sm:text-center">
+                            <div class="bg-surface-white p-2.5 rounded-lg border border-surface-border flex items-center justify-between sm:block">
+                                <div class="text-xs text-navy-500">ได้น้ำมันเพิ่ม</div>
+                                <div class="font-digital font-bold text-lg sm:text-lg text-navy-900">
+                                    +<span id="calcAddedLiters">7.13</span> <span class="text-sm font-sans font-normal">L</span>
+                                </div>
+                            </div>
+                            <div class="bg-surface-white p-2.5 rounded-lg border border-surface-border flex items-center justify-between sm:block">
+                                <div class="text-xs text-navy-500">รวมในถัง / เกจ์ใหม่</div>
+                                <div class="font-digital font-bold text-lg sm:text-lg text-navy-900">
+                                    <span id="calcTotalLiters">8.63</span>L <span id="calcNewBarsText" class="text-sm font-sans font-semibold text-gold-700">(4 ขีด)</span>
+                                </div>
+                            </div>
+                            <div class="bg-surface-white p-2.5 rounded-lg border border-surface-border flex items-center justify-between sm:block">
+                                <div class="text-xs text-navy-500">วิ่งได้รวมทั้งหมด</div>
+                                <div class="font-digital font-bold text-lg sm:text-lg text-gold-700">
+                                    <span id="calcTotalRange">271</span> <span class="text-sm font-sans font-normal text-navy-700">กม.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 3: FUEL CONSUMPTION RATE (km/L) - FULLY SYNCHRONIZED -->
+                <section id="step3" class="snap-item bg-surface-white rounded-xl p-4 sm:p-6 border border-surface-border">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2.5">
+                            <span class="font-digital font-bold text-base text-gold-700 w-6">3</span>
+                            <div>
+                                <h3 class="font-bold text-navy-900 text-lg sm:text-lg">อัตราสิ้นเปลืองเชื้อเพลิง (กม./ลิตร)</h3>
+                                <p class="text-sm text-navy-500">พิมพ์ตัวเลขหรือเลื่อนสไลเดอร์ ค่าจะอัปเดตทุกส่วนของเว็บทันที</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direct Number Input + Slider -->
+                    <div class="bg-surface-subtle rounded-xl p-4 border border-surface-border mb-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                            <label for="kmlNumberInput" class="text-base font-bold text-navy-900">
+                                ค่าอัตราสิ้นเปลืองที่ใช้คำนวณ (km/L):
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    id="kmlNumberInput"
+                                    value="31.4"
+                                    min="15"
+                                    max="50"
+                                    step="0.1"
+                                    oninput="updateKmlRate(this.value, 'input')"
+                                    class="w-28 text-center bg-surface-white text-navy-900 font-digital font-bold text-xl px-3 py-1.5 rounded-xl border-2 border-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-500"
+                                >
+                                <span class="text-sm font-bold text-navy-700">กม./ลิตร</span>
+                            </div>
+                        </div>
+
+                        <input
+                            type="range"
+                            id="kmlRangeSlider"
+                            min="18"
+                            max="45"
+                            step="0.1"
+                            value="31.4"
+                            oninput="updateKmlRate(this.value, 'slider')"
+                        >
+                        <div class="flex justify-between text-xs font-digital text-navy-500 mt-1.5">
+                            <span>18 km/L (ซัดหนัก)</span>
+                            <span class="hidden sm:inline">28 km/L</span>
+                            <span class="hidden sm:inline">31.4 km/L (ค่าจริงของคุณ)</span>
+                            <span>45 km/L (ประหยัดสุด)</span>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- RIGHT COLUMN (Sections 4 & 5: Route Selection & Final Trip Verdict) -->
+            <div class="lg:col-span-5 space-y-6">
+
+                <!-- SECTION 4: ROUTE & DISTANCE PLANNER -->
+                <section id="step4" class="snap-item bg-surface-white rounded-xl p-4 sm:p-6 border border-surface-border">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2.5">
+                            <span class="font-digital font-bold text-base text-gold-700 w-6">4</span>
+                            <div>
+                                <h3 class="font-bold text-navy-900 text-lg sm:text-lg">เส้นทางและระยะทางทริป</h3>
+                                <p class="text-sm text-navy-500">เลือกเส้นทางที่ใช้ประจำ หรือกรอกระยะทางเอง</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preset Routes List -->
+                    <div class="space-y-2 mb-4">
+                        <button onclick="selectPresetRoute('msu_kk_home', 156.5, 'หอขวัญจิรา (มมส.) ➔ ลีเพลส ขอนแก่น ➔ บ้านโนนหัน')" id="routeBtn_msu_kk_home" class="route-btn w-full p-3 rounded-xl border text-left transition flex items-center justify-between gap-2">
+                            <div>
+                                <div class="text-sm sm:text-base font-bold">หอขวัญจิรา ➔ ลีเพลส ➔ บ้านโนนหัน</div>
+                                <div class="text-xs opacity-75">มมส. ไปขอนแก่น (58.9 กม.) + ไปโนนหัน ชุมแพ (97.6 กม.)</div>
+                            </div>
+                            <span class="font-digital font-bold text-base px-2.5 py-1 rounded bg-surface-subtle text-navy-900 shrink-0">156.5 กม.</span>
+                        </button>
+
+                        <button onclick="selectPresetRoute('msu_kk', 58.9, 'หอขวัญจิรา (มมส.) ➔ ลีเพลส ขอนแก่น')" id="routeBtn_msu_kk" class="route-btn w-full p-3 rounded-xl border text-left transition flex items-center justify-between gap-2">
+                            <div>
+                                <div class="text-sm sm:text-base font-bold">หอขวัญจิรา (มมส.) ➔ ลีเพลส ขอนแก่น</div>
+                                <div class="text-xs opacity-75">วิ่งเส้นทางหลวง 208 เข้าถนนศรีจันทร์</div>
+                            </div>
+                            <span class="font-digital font-bold text-base px-2.5 py-1 rounded bg-surface-subtle text-navy-900 shrink-0">58.9 กม.</span>
+                        </button>
+
+                        <button onclick="selectPresetRoute('kk_home', 97.6, 'ลีเพลส ขอนแก่น ➔ บ้านโนนหัน (ชุมแพ)')" id="routeBtn_kk_home" class="route-btn w-full p-3 rounded-xl border text-left transition flex items-center justify-between gap-2">
+                            <div>
+                                <div class="text-sm sm:text-base font-bold">ลีเพลส ขอนแก่น ➔ บ้านโนนหัน (ชุมแพ)</div>
+                                <div class="text-xs opacity-75">ถ.มะลิวัลย์ (ทล.12) ผ่านบ้านฝาง–หนองเรือ–ชุมแพ</div>
+                            </div>
+                            <span class="font-digital font-bold text-base px-2.5 py-1 rounded bg-surface-subtle text-navy-900 shrink-0">97.6 กม.</span>
+                        </button>
+
+                        <button onclick="selectPresetRoute('city_errands', 15.0, 'ขี่ทำธุระในเมือง (ม.ใหม่ / ท่าขอนยาง)')" id="routeBtn_city_errands" class="route-btn w-full p-3 rounded-xl border text-left transition flex items-center justify-between gap-2">
+                            <div>
+                                <div class="text-sm sm:text-base font-bold">ขี่ทำธุระในเมือง (ม.ใหม่ / ท่าขอนยาง)</div>
+                                <div class="text-xs opacity-75">ขี่ระยะสั้นวนในพื้นที่</div>
+                            </div>
+                            <span class="font-digital font-bold text-base px-2.5 py-1 rounded bg-surface-subtle text-navy-900 shrink-0">15.0 กม.</span>
+                        </button>
+                    </div>
+
+                    <!-- เส้นทางที่บันทึกไว้ -->
+                    <div id="savedRoutesList" class="space-y-2 mb-3"></div>
+
+                    <button type="button" id="addRouteBtn" onclick="openRouteBuilder()" class="w-full mb-4 flex items-center justify-center gap-2 rounded-lg bg-surface-white border border-navy-900 text-navy-900 hover:bg-navy-900/5 text-sm font-semibold py-2.5 transition">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        <span>สร้างเส้นทางเอง (เริ่มต้น – จุดแวะ – ปลายทาง)</span>
+                    </button>
+
+                    <div id="routeBuilder" class="hidden mb-4 rounded-xl border border-surface-border bg-surface-subtle p-4 space-y-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <h4 class="text-base font-bold text-navy-900">สร้างเส้นทางเอง</h4>
+                            <button type="button" onclick="closeRouteBuilder()" class="text-sm text-navy-500 underline">ปิด</button>
+                        </div>
+                        <p class="text-sm text-navy-500">ตั้งจุดเริ่มต้นและปลายทาง แล้วเพิ่มจุดแวะได้กี่จุดก็ได้ ระยะทางแต่ละช่วงประมาณจากเส้นตรง × 1.3 แก้เองได้ถ้ารู้ระยะจริง</p>
+
+                        <div id="routePointsList" class="space-y-1"></div>
+
+                        <button type="button" onclick="addStop()" class="w-full flex items-center justify-center gap-2 rounded-lg bg-surface-white border border-navy-900 text-navy-900 hover:bg-navy-900/5 text-sm font-semibold py-2.5 transition">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                            <span>เพิ่มจุดแวะ</span>
+                        </button>
+
+                        <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-white border border-surface-border px-3 py-2.5">
+                            <span class="text-sm font-bold text-navy-800">ระยะทางรวม (ขาเดียว)</span>
+                            <span class="font-digital font-bold text-lg text-gold-700"><span id="builderTotal">0.0</span> <span class="text-sm font-sans font-normal text-navy-500">กม.</span></span>
+                        </div>
+
+                        <a id="builderMapsLink" href="#" target="_blank" rel="noopener" class="hidden text-sm underline text-navy-700">เปิดเส้นทางใน Google Maps เพื่อเช็กระยะทางจริง</a>
+                        <p id="builderMsg" class="text-sm text-navy-900 font-semibold min-h-[1.25rem]"></p>
+
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveRoute()" class="flex-1 bg-navy-900 hover:bg-navy-800 text-surface-white font-semibold text-sm py-2.5 rounded-lg transition">บันทึกและเลือกเส้นทางนี้</button>
+                            <button type="button" onclick="closeRouteBuilder()" class="px-4 rounded-lg bg-surface-white border border-surface-border text-navy-700 text-sm font-semibold hover:border-navy-700 transition">ยกเลิก</button>
+                        </div>
+                    </div>
+
+                    <!-- One-Way / Round-Trip Toggle & Custom Distance Input -->
+                    <div class="bg-surface-subtle rounded-xl p-3.5 border border-surface-border space-y-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="setTripMultiplier(1)" id="tripMult_1" class=" py-2 px-3 rounded-lg font-bold text-sm border transition">
+                                ขาเดียว (x1)
+                            </button>
+                            <button onclick="setTripMultiplier(2)" id="tripMult_2" class=" py-2 px-3 rounded-lg font-bold text-sm border transition">
+                                ไป-กลับ (x2)
+                            </button>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                            <label for="customDistanceInput" class="text-sm font-bold text-navy-800">
+                                ระยะทางรวมที่ใช้คำนวณจริง:
+                            </label>
+                            <div class="flex items-center gap-1.5">
+                                <input
+                                    type="number"
+                                    id="customDistanceInput"
+                                    value="156.5"
+                                    min="1"
+                                    max="2000"
+                                    step="0.5"
+                                    oninput="handleCustomDistanceInput(this.value)"
+                                    class="w-28 text-center bg-surface-white text-navy-900 font-digital font-bold text-lg px-2.5 py-1 rounded-lg border-2 border-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-500"
+                                >
+                                <span class="text-sm font-bold text-navy-700">กม.</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 5: FINAL TRIP VERDICT (30% Deep Navy Card + 10% Gold Accent) -->
+                <section id="step5" class="snap-item bg-surface-white text-navy-900 rounded-xl p-4 sm:p-6 border border-surface-border">
+                    <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-surface-border">
+                        <div class="flex items-center gap-2.5">
+                            <span class="font-digital font-bold text-base text-gold-700 w-6">5</span>
+                            <div>
+                                <h3 class="font-bold text-navy-900 text-lg sm:text-lg">สรุปผลการเดินทาง (Trip Verdict)</h3>
+                                <p id="verdictRouteTitle" class="text-sm text-navy-500 font-medium">หอขวัญจิรา (มมส.) ➔ ลีเพลส ขอนแก่น ➔ บ้านโนนหัน</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Primary Status Banner -->
+                    <div id="verdictMainBanner" class="rounded-xl p-4 mb-4 border border-surface-border border-l-4 border-l-navy-900 bg-surface-subtle">
+                        <div class="flex items-start gap-3">
+                            <div id="verdictIconWrap" class="w-10 h-10 rounded-full bg-navy-900 text-surface-white flex items-center justify-center shrink-0">
+                                <span id="verdictIcon" class="flex"></span>
+                            </div>
+                            <div>
+                                <h4 id="verdictHeadline" class="font-bold text-lg sm:text-lg text-navy-900">
+                                    น้ำมันเพียงพอ เดินทางถึงปลายทางสบาย!
+                                </h4>
+                                <p id="verdictSubtext" class="text-sm text-navy-700 mt-0.5 leading-relaxed">
+                                    เมื่อถึงปลายทางจะมีน้ำมันเหลือประมาณ 3.64 ลิตร (2 ขีด) วิ่งต่อได้อีก 114 กม.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key Metrics Breakdown -->
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="bg-surface-subtle p-3.5 rounded-xl border border-surface-border">
+                            <div class="text-xs text-navy-500">ระยะทางทริปทั้งหมด</div>
+                            <div class="font-digital font-bold text-xl text-navy-900 mt-0.5">
+                                <span id="sumTripDistance">156.5</span> <span class="text-sm font-sans font-normal text-navy-500">กม.</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-surface-subtle p-3.5 rounded-xl border border-surface-border">
+                            <div class="text-xs text-navy-500">น้ำมันที่ต้องใช้ในทริปนี้</div>
+                            <div class="font-digital font-bold text-xl text-gold-700 mt-0.5">
+                                <span id="sumFuelNeeded">4.98</span> <span class="text-sm font-sans font-normal text-navy-500">ลิตร</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-surface-subtle p-3.5 rounded-xl border border-surface-border">
+                            <div class="text-xs text-navy-500">คิดเป็นค่าน้ำมันที่ใช้จริง</div>
+                            <div class="font-digital font-bold text-xl text-navy-900 mt-0.5">
+                                ~<span id="sumTripCostBaht">210</span> <span class="text-sm font-sans font-normal text-navy-500">บาท</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-surface-subtle p-3.5 rounded-xl border border-surface-border">
+                            <div class="text-xs text-navy-500">เหลือน้ำมันเมื่อถึงปลายทาง</div>
+                            <div class="font-digital font-bold text-xl text-gold-700 mt-0.5">
+                                <span id="sumRemainingLiters">3.64</span>L <span id="sumRemainingBars" class="text-sm font-sans font-semibold text-navy-700">(2 ขีด)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- น้ำมันเหลือแต่ละจุดตลอดเส้นทาง (แสดงเมื่อมีจุดแวะ หรือเลือกไป-กลับ) -->
+                    <div id="legBreakdown" class="hidden mb-4">
+                        <div class="text-sm font-bold text-navy-900 mb-2">น้ำมันเหลือแต่ละจุดตลอดเส้นทาง</div>
+                        <div id="legBreakdownList" class="space-y-1.5"></div>
+                        <p id="legBreakdownNote" class="text-xs text-navy-500 mt-2"></p>
+                    </div>
+
+                    <!-- Minimum Recommended Refuel Advice Box -->
+                    <div class="bg-surface-subtle rounded-xl p-3.5 border border-surface-border text-sm space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-navy-700">คำแนะนำการเติมขั้นต่ำสำหรับทริปนี้:</span>
+                            <span id="minTopupAdvice" class="font-bold text-navy-900">เติมอย่างน้อย 210 บาท (เพื่อให้เหลือสำรองปลอดภัย)</span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-navy-500">
+                            <span>ความจุถัง XMAX 300: 13.0 ลิตร (ไฟกะพริบ Trip F เมื่อต่ำกว่า ~1.5 ลิตร)</span>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    
+        <!-- ซิงก์ข้อมูลข้ามเครื่อง -->
+        <section id="syncCard" class="bg-surface-white rounded-xl p-4 sm:p-6 border border-surface-border">
+            <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
+                <div>
+                    <h3 class="font-bold text-navy-900 text-lg">ซิงก์ข้อมูลข้ามเครื่อง</h3>
+                    <p class="text-sm text-navy-500">เส้นทางที่บันทึกและค่าที่ตั้งไว้ จะตามไปทุกเครื่องที่ใส่รหัสเดียวกัน</p>
+                </div>
+                <span id="syncStatus" class="text-xs font-medium px-2.5 py-1 rounded-md bg-surface-subtle border border-surface-border text-navy-700">ยังไม่ได้ตั้งค่า</span>
+            </div>
+
+            <div class="space-y-2">
+                <label for="syncUrl" class="block text-sm font-bold text-navy-900">ลิงก์ Web App (จาก Apps Script)</label>
+                <input id="syncUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/.../exec"
+                    class="w-full bg-surface-white text-navy-900 text-base px-3 py-2.5 rounded-lg border-2 border-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-500">
+                <label for="syncCode" class="block text-sm font-bold text-navy-900">รหัสซิงก์ (ตั้งเอง ใช้รหัสเดียวกันทุกเครื่อง)</label>
+                <input id="syncCode" type="password" autocomplete="off" placeholder="อย่างน้อย 6 ตัวอักษร ยิ่งยาวยิ่งปลอดภัย"
+                    class="w-full bg-surface-white text-navy-900 text-base px-3 py-2.5 rounded-lg border-2 border-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-500">
+                <p id="syncMsg" class="text-sm text-navy-900 font-semibold min-h-[1.25rem]"></p>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="saveSyncCfg()" class="bg-navy-900 hover:bg-navy-800 text-surface-white font-semibold text-sm px-5 py-2.5 rounded-lg transition">บันทึกและซิงก์ตอนนี้</button>
+                    <button type="button" onclick="clearSyncCfg()" class="px-4 py-2.5 rounded-lg bg-surface-white border border-surface-border text-navy-700 text-sm font-semibold hover:border-navy-700 transition">ปิดซิงก์ในเครื่องนี้</button>
+                </div>
+            </div>
+
+            <details class="mt-4 rounded-xl border border-surface-border bg-surface-subtle p-3.5">
+                <summary class="cursor-pointer text-sm font-bold text-navy-900">วิธีตั้งค่า (ทำครั้งเดียว)</summary>
+                <ol class="list-decimal pl-5 mt-3 space-y-1.5 text-sm text-navy-700">
+                    <li>สร้าง Google Sheets ใหม่ แล้วเปิดเมนู ส่วนขยาย ➔ Apps Script</li>
+                    <li>ลบโค้ดเดิมทิ้ง แล้ววางโค้ดด้านล่าง กดบันทึก</li>
+                    <li>กด ทำให้ใช้งานได้ ➔ การทำให้ใช้งานได้รายการใหม่ ➔ ประเภท "เว็บแอป"</li>
+                    <li>ตั้ง "เรียกใช้ในฐานะ" เป็น ฉัน และ "ผู้มีสิทธิ์เข้าถึง" เป็น ทุกคน แล้วกดทำให้ใช้งานได้ (อนุญาตสิทธิ์ตามที่ขอ)</li>
+                    <li>คัดลอก URL ของเว็บแอป (ลงท้าย /exec) มาวางในช่องด้านบน พร้อมตั้งรหัสซิงก์</li>
+                    <li>ที่เครื่องอื่น วาง URL และรหัสเดียวกัน ข้อมูลจะมาเอง</li>
+                </ol>
+                <p class="text-xs text-navy-500 mt-3">รหัสซิงก์คือกุญแจของข้อมูลคุณ ใครรู้ทั้ง URL และรหัสก็อ่านและเขียนข้อมูลชุดนี้ได้ จึงควรตั้งให้เดายาก ฝั่งเซิร์ฟเวอร์เก็บรหัสในรูปแบบแฮช ไม่เก็บตัวจริง</p>
+                <div class="flex items-center justify-between mt-3 mb-1.5">
+                    <span class="text-sm font-bold text-navy-900">โค้ด Apps Script</span>
+                    <button type="button" onclick="copyGasCode()" id="copyGasBtn" class="text-sm font-semibold px-3 py-1.5 rounded-lg bg-surface-white border border-navy-900 text-navy-900 hover:bg-navy-900/5 transition">คัดลอกโค้ด</button>
+                </div>
+                <pre id="gasCode" class="text-xs bg-surface-white border border-surface-border rounded-lg p-3 overflow-x-auto max-h-64 font-mono text-navy-900"></pre>
+            </details>
+        </section>
+    </main>
+
+    <!-- แถบผลลัพธ์สด (เฉพาะมือถือ) แตะเพื่อไปที่สรุปผล -->
+    <a id="stickyVerdict" href="#step5" class="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-navy-900 text-surface-white px-4 py-3 flex items-center justify-between gap-3 border-t border-navy-700 transition-transform duration-200">
+        <span class="flex items-center gap-2 min-w-0 text-base">
+            <span id="stickyVerdictTag" class="shrink-0 text-xs font-bold px-2 py-0.5 rounded bg-gold-500 text-navy-950">พอ</span>
+            <span id="stickyVerdictText" class="truncate">เหลือ 3.64 ลิตร</span>
+        </span>
+        <span class="shrink-0 text-sm text-surface-subtle/80">ดูสรุป ›</span>
+    </a>
+
+    <!-- APPLICATION LOGIC -->
+    <script>
+        // ============================================================================
+        // XMAX 300 FUEL TANK SPECIFICATION (13.0 Liters Total, 6 Bars + Trip F)
+        // ============================================================================
+        const TANK_CAPACITY = 13.0;
+        const RESERVE_TRIP_F_LITERS = 1.5;
+
+        const XMAX_BAR_LEVELS = [
+            { bars: 0, label: 'ไฟกะพริบ (Trip F)', shortLabel: 'ไฟกะพริบ', liters: 1.5, desc: 'น้ำมันสำรองก้นถัง' },
+            { bars: 1, label: '1 ขีด', shortLabel: '1 ขีด', liters: 3.0, desc: 'ขีดสุดท้ายก่อนกะพริบ' },
+            { bars: 2, label: '2 ขีด', shortLabel: '2 ขีด', liters: 4.9, desc: 'ประมาณ 1/3 ถัง' },
+            { bars: 3, label: '3 ขีด (ครึ่งถัง)', shortLabel: '3 ขีด', liters: 6.8, desc: 'ครึ่งถังพอดี' },
+            { bars: 4, label: '4 ขีด', shortLabel: '4 ขีด', liters: 8.8, desc: 'ค่อนถัง' },
+            { bars: 5, label: '5 ขีด', shortLabel: '5 ขีด', liters: 10.8, desc: 'เกือบเต็มถัง' },
+            { bars: 6, label: '6 ขีด (เต็มถัง)', shortLabel: '6 ขีดเต็ม', liters: 13.0, desc: 'เต็มถัง 13.0 ลิตร' }
+        ];
+
+        // Base Bangkok retail prices + Provincial tax offsets
+        const BASE_FUEL_PRICES = {
+            gsh95: { id: 'gsh95', name: 'แก๊สโซฮอล์ 95', shortName: 'GSH 95', basePrice: 42.04 },
+            gsh91: { id: 'gsh91', name: 'แก๊สโซฮอล์ 91', shortName: 'GSH 91', basePrice: 41.67 },
+            e20:   { id: 'e20',   name: 'แก๊สโซฮอล์ E20', shortName: 'E20',    basePrice: 35.69 },
+            ben95: { id: 'ben95', name: 'เบนซิน 95',     shortName: 'เบนซิน 95', basePrice: 51.03 }
+        };
+
+        const PROVINCE_TAX = {
+            mahasarakham: { name: 'จ.มหาสารคาม (ม.ใหม่ / ท่าขอนยาง)', tax: 0.05 },
+            khonkaen:     { name: 'จ.ขอนแก่น (ในเมือง / ชุมแพ / โนนหัน)', tax: 0.05 },
+            bangkok:      { name: 'ราคากลาง กรุงเทพฯ และปริมณฑล', tax: 0.00 }
+        };
+
+        // ============================================================================
+        // REACTIVE STATE
+        // ============================================================================
+        const state = {
+            currentBars: 0,              // Default: Blinking (Trip F = 1.5L)
+            currentLiters: 1.5,
+            provinceKey: 'mahasarakham', // Default: Mahasarakham (+0.05 THB tax)
+            fuelTypeKey: 'gsh95',        // Default: Gasohol 95 (42.09 THB/L)
+            refuelBaht: 300,             // Default: 300 THB
+            kml: 31.4,                   // Default: User's real average 31.4 km/L
+            routeKey: 'msu_kk_home',
+            routeTitle: 'หอขวัญจิรา (มมส.) ➔ ลีเพลส ขอนแก่น ➔ บ้านโนนหัน',
+            baseRouteKm: 156.5,
+            tripMultiplier: 1,           // 1 = One-way, 2 = Round-trip
+            totalTripKm: 156.5,
+            originCoords: null,          // ตำแหน่ง GPS ปัจจุบัน
+            routeLegs: null              // ช่วงของเส้นทางที่เลือก [{from,to,km}] ใช้แสดงน้ำมันที่เหลือแต่ละจุด
+        };
+
+        // Helper: Convert Liters in tank to XMAX 0-6 bar scale
+        function litersToBars(liters) {
+            if (liters <= 0.05) return -1; // Empty / Dead
+            if (liters < 2.2) return 0;    // Blinking Trip F (~1.5L)
+            if (liters < 4.0) return 1;
+            if (liters < 5.9) return 2;
+            if (liters < 7.8) return 3;
+            if (liters < 9.8) return 4;
+            if (liters < 11.8) return 5;
+            return 6;
+        }
+
+        function getBarText(bars, liters) {
+            if (liters <= 0) return 'น้ำมันหมดถัง!';
+            if (bars <= 0) return 'ไฟกะพริบ (Trip F)';
+            if (bars === 6) return '6 ขีด (เต็มถัง)';
+            return `${bars} ขีด`;
+        }
+
+        function getActiveFuelPrice() {
+            const base = BASE_FUEL_PRICES[state.fuelTypeKey].basePrice;
+            const tax = PROVINCE_TAX[state.provinceKey].tax;
+            return +(base + tax).toFixed(2);
+        }
+
+        // ============================================================================
+        // RENDER VISUAL 6-BAR GAUGE (Strictly Navy & Gold)
+        // ============================================================================
+        function renderSixBarGauge(containerId, barsCount, isClickable = false, isEmptyDanger = false) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+
+            for (let i = 1; i <= 6; i++) {
+                const seg = document.createElement('div');
+                let classes = 'gauge-seg rounded h-full ';
+
+                if (isClickable) {
+                    classes += 'cursor-pointer hover:opacity-90 ';
+                    seg.onclick = () => selectCurrentBars(i);
+                    seg.title = `คลิกเพื่อเลือก ${i} ขีด`;
+                }
+
+                if (isEmptyDanger) {
+                    // Fuel completely depleted
+                    classes += 'bg-surface-border border border-gold-500 blink-warning';
+                } else if (barsCount === 0 && i === 1) {
+                    // Blinking Trip F on first segment
+                    classes += 'bg-gold-500 blink-warning shadow-sm';
+                } else if (i <= barsCount) {
+                    // Active solid gold bar
+                    classes += 'bg-gold-500';
+                } else {
+                    // Inactive navy segment
+                    classes += 'bg-surface-border';
+                }
+
+                seg.className = classes;
+                container.appendChild(seg);
+            }
+        }
+
+        // ============================================================================
+        // SECTION 1: CURRENT FUEL BARS SELECTOR
+        // ============================================================================
+        function renderBarSelectorButtons() {
+            const grid = document.getElementById('barSelectorGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            XMAX_BAR_LEVELS.forEach(item => {
+                const isSelected = state.currentBars === item.bars;
+                const estKm = Math.round(item.liters * state.kml);
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => selectCurrentBars(item.bars);
+
+                // Strictly 60-30-10 styling: Navy active with Gold highlight, or Clean White inactive
+                if (isSelected) {
+                    btn.className = 'p-3 rounded-xl border-2 border-navy-900 bg-navy-900/5 text-navy-900 text-left transition flex flex-col justify-between';
+                } else {
+                    btn.className = 'p-3 rounded-xl border border-surface-border bg-surface-subtle hover:bg-surface-white hover:border-navy-700 text-navy-900 text-left transition flex flex-col justify-between';
+                }
+
+                // Mini bar indicator inside button
+                let miniBarsHtml = '<div class="flex gap-0.5 mt-1.5">';
+                for (let b = 1; b <= 6; b++) {
+                    if (item.bars === 0 && b === 1) {
+                        miniBarsHtml += `<span class="h-1.5 flex-1 rounded-sm bg-gold-500 blink-warning"></span>`;
+                    } else if (b <= item.bars) {
+                        miniBarsHtml += `<span class="h-1.5 flex-1 rounded-sm ${isSelected ? 'bg-gold-500' : 'bg-navy-700'}"></span>`;
+                    } else {
+                        miniBarsHtml += `<span class="h-1.5 flex-1 rounded-sm bg-surface-border"></span>`;
+                    }
+                }
+                miniBarsHtml += '</div>';
+
+                btn.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between gap-1">
+                            <span class="font-bold text-sm sm:text-base ${isSelected ? 'text-navy-900' : 'text-navy-900'}">${item.shortLabel}</span>
+                            <span class="font-digital text-sm font-bold text-navy-700">~${item.liters.toFixed(1)}L</span>
+                        </div>
+                        ${miniBarsHtml}
+                    </div>
+                    <div class="mt-2 pt-1.5 border-t border-surface-border text-navy-500 flex items-center justify-between text-xs">
+                        <span>วิ่งได้</span>
+                        <strong class="font-digital ${isSelected ? 'text-navy-900' : 'text-navy-900'}">~${estKm} กม.</strong>
+                    </div>
+                `;
+                grid.appendChild(btn);
+            });
+        }
+
+        function selectCurrentBars(bars) {
+            const found = XMAX_BAR_LEVELS.find(x => x.bars === bars) || XMAX_BAR_LEVELS[0];
+            state.currentBars = found.bars;
+            state.currentLiters = found.liters;
+            updateAllCalculations();
+        }
+
+        // ============================================================================
+        // SECTION 2: GPS AUTO PRICE & FUEL TYPE SELECTOR
+        // ============================================================================
+        function renderFuelTypeCards() {
+            const grid = document.getElementById('fuelTypeGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const tax = PROVINCE_TAX[state.provinceKey].tax;
+
+            Object.values(BASE_FUEL_PRICES).forEach(fuel => {
+                const isSelected = state.fuelTypeKey === fuel.id;
+                const netPrice = (fuel.basePrice + tax).toFixed(2);
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => {
+                    state.fuelTypeKey = fuel.id;
+                    updateAllCalculations();
+                };
+
+                if (isSelected) {
+                    btn.className = 'p-3 rounded-xl border-2 border-navy-900 bg-navy-900/5 text-navy-900 text-left transition';
+                } else {
+                    btn.className = 'p-3 rounded-xl border border-surface-border bg-surface-subtle hover:bg-surface-white hover:border-navy-700 text-navy-900 text-left transition';
+                }
+
+                btn.innerHTML = `
+                    <div class="text-sm font-bold text-navy-700">${fuel.name}</div>
+                    <div class="font-digital font-extrabold text-lg mt-0.5 text-navy-900">
+                        ${netPrice} <span class="text-xs font-sans font-normal opacity-75">฿/L</span>
+                    </div>
+                `;
+                grid.appendChild(btn);
+            });
+
+            // Highlight active province button
+            Object.keys(PROVINCE_TAX).forEach(key => {
+                const el = document.getElementById(`provBtn_${key}`);
+                if (!el) return;
+                if (key === state.provinceKey) {
+                    el.className = 'prov-btn py-2.5 sm:py-1.5 px-2 rounded-lg font-bold border-2 border-navy-900 bg-navy-900/5 text-navy-900 transition';
+                } else {
+                    el.className = 'prov-btn py-2.5 sm:py-1.5 px-2 rounded-lg font-medium border border-surface-border bg-surface-white text-navy-700 hover:border-navy-700 transition';
+                }
+            });
+
+            document.getElementById('gpsRegionName').textContent = PROVINCE_TAX[state.provinceKey].name;
+            const taxVal = PROVINCE_TAX[state.provinceKey].tax;
+            document.getElementById('gpsTaxNote').textContent = taxVal > 0
+                ? `รวมภาษี อบจ. +${taxVal.toFixed(2)} บาท/ลิตร แล้ว`
+                : 'ราคามาตรฐานหน้าปั๊ม (รวม VAT 7% แล้ว)';
+        }
+
+        function setProvincePricing(provKey) {
+            state.provinceKey = provKey;
+            updateAllCalculations();
+        }
+
+        function detectGPSLocation() {
+            const headerText = document.getElementById('headerGpsText');
+            const regionName = document.getElementById('gpsRegionName');
+            headerText.textContent = 'กำลังดึงพิกัด GPS...';
+            regionName.textContent = 'กำลังตรวจสอบตำแหน่งปัจจุบัน...';
+
+            if (!navigator.geolocation) {
+                setProvincePricing('mahasarakham');
+                headerText.textContent = 'พิกัด: มหาสารคาม (+0.05฿)';
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const { latitude, longitude } = pos.coords;
+                    state.originCoords = { lat: latitude, lng: longitude };
+                    onOriginUpdated();
+                    // Check proximity to Mahasarakham (~16.18, 103.30) vs Khon Kaen / Chumphae (~16.44, 102.83 / 16.59, 101.99)
+                    if (longitude > 103.05) {
+                        state.provinceKey = 'mahasarakham';
+                        headerText.textContent = `GPS: มหาสารคาม (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
+                    } else if (latitude > 15.5 && latitude < 17.5) {
+                        state.provinceKey = 'khonkaen';
+                        headerText.textContent = `GPS: ขอนแก่น (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
+                    } else {
+                        state.provinceKey = 'bangkok';
+                        headerText.textContent = `GPS: พิกัดปัจจุบัน (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
+                    }
+                    updateAllCalculations();
+                },
+                () => {
+                    // Fallback to Mahasarakham / Khon Kaen Northeast standard (+0.05 THB/L)
+                    state.provinceKey = 'mahasarakham';
+                    headerText.textContent = 'พิกัดเริ่มต้น: มหาสารคาม / ขอนแก่น';
+                    updateAllCalculations();
+                },
+                { timeout: 5000 }
+            );
+        }
+
+        function handleBahtInputChange(val) {
+            const num = parseFloat(val);
+            state.refuelBaht = isNaN(num) || num < 0 ? 0 : num;
+            updateAllCalculations();
+        }
+
+        function setRefuelBaht(amount) {
+            state.refuelBaht = amount;
+            document.getElementById('refuelBahtInput').value = amount;
+            updateAllCalculations();
+        }
+
+        function fillFullTank() {
+            const price = getActiveFuelPrice();
+            const emptySpaceLiters = Math.max(0, TANK_CAPACITY - state.currentLiters);
+            const fullBaht = Math.ceil(emptySpaceLiters * price);
+            setRefuelBaht(fullBaht);
+        }
+
+        function triggerRefuelCalculation() {
+            const inputVal = parseFloat(document.getElementById('refuelBahtInput').value);
+            state.refuelBaht = isNaN(inputVal) || inputVal < 0 ? 0 : inputVal;
+            updateAllCalculations();
+        }
+
+        // ============================================================================
+        // SECTION 3: FUEL CONSUMPTION RATE (km/L) SYNCHRONIZATION
+        // ============================================================================
+        function updateKmlRate(val, source) {
+            let num = parseFloat(val);
+            if (isNaN(num) || num <= 5) num = 31.4;
+            if (num > 60) num = 60;
+
+            state.kml = +num.toFixed(1);
+
+            if (source !== 'input') {
+                document.getElementById('kmlNumberInput').value = state.kml;
+            }
+            if (source !== 'slider') {
+                document.getElementById('kmlRangeSlider').value = Math.min(45, Math.max(18, state.kml));
+            }
+
+            updateAllCalculations();
+        }
+
+        function styleKmlPresetButtons() {
+            const presets = [
+                { id: 'kmlPreset_37', val: 37.0 },
+                { id: 'kmlPreset_31_4', val: 31.4 },
+                { id: 'kmlPreset_28', val: 28.0 },
+                { id: 'kmlPreset_25', val: 25.0 }
+            ];
+
+            presets.forEach(p => {
+                const btn = document.getElementById(p.id);
+                if (!btn) return;
+                const isMatch = Math.abs(state.kml - p.val) < 0.05;
+                if (isMatch) {
+                    btn.className = 'kml-preset-btn p-3 rounded-xl border-2 border-navy-900 bg-navy-900/5 text-navy-900 text-left transition';
+                } else {
+                    btn.className = 'kml-preset-btn p-3 rounded-xl border border-surface-border bg-surface-subtle hover:bg-surface-white hover:border-navy-700 text-navy-900 text-left transition';
+                }
+            });
+        }
+
+        // ============================================================================
+        // เส้นทางที่สร้างเอง: จุดเริ่มต้น -> จุดแวะ (กี่จุดก็ได้) -> ปลายทาง
+        // ============================================================================
+        const ROUTES_KEY = 'xmaxCustomRoutes';
+        const OLD_PLACES_KEY = 'xmaxCustomPlaces';   // เวอร์ชันเก่า (สถานที่เดี่ยว) จะถูกย้ายมาเป็นเส้นทางให้อัตโนมัติ
+        const DETOUR_FACTOR = 1.3;                   // ระยะถนน ≈ ระยะเส้นตรง × 1.3
+        const BTN_OUTLINE = 'text-sm font-semibold px-3 py-2 rounded-lg bg-surface-white border border-navy-900 text-navy-900 hover:bg-navy-900/5 transition';
+
+        // ช่วงของเส้นทางสำเร็จรูป (ใช้แสดงน้ำมันที่เหลือแต่ละจุด)
+        const PRESET_LEGS = {
+            msu_kk_home: [
+                { from: 'หอขวัญจิรา (มมส.)', to: 'ลีเพลส ขอนแก่น', km: 58.9 },
+                { from: 'ลีเพลส ขอนแก่น', to: 'บ้านโนนหัน (ชุมแพ)', km: 97.6 }
+            ],
+            msu_kk: [{ from: 'หอขวัญจิรา (มมส.)', to: 'ลีเพลส ขอนแก่น', km: 58.9 }],
+            kk_home: [{ from: 'ลีเพลส ขอนแก่น', to: 'บ้านโนนหัน (ชุมแพ)', km: 97.6 }]
+        };
+
+        let savedRoutes = [];
+        let draft = null;
+
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function validRoute(r) {
+            return !!r && typeof r.id === 'string' && Array.isArray(r.points) && r.points.length >= 2 &&
+                Array.isArray(r.legs) && r.legs.length === r.points.length - 1 &&
+                r.legs.every(k => typeof k === 'number' && k > 0) &&
+                r.points.every(p => p && typeof p.name === 'string');
+        }
+
+        function loadRoutes() {
+            savedRoutes = [];
+            try {
+                const raw = localStorage.getItem(ROUTES_KEY);
+                if (raw) {
+                    const arr = JSON.parse(raw);
+                    if (Array.isArray(arr)) savedRoutes = arr.filter(validRoute);
+                    return;
+                }
+                const old = JSON.parse(localStorage.getItem(OLD_PLACES_KEY) || '[]');
+                if (Array.isArray(old)) {
+                    savedRoutes = old
+                        .filter(p => p && typeof p.id === 'string' && isFinite(p.lat) && isFinite(p.lng) && p.km > 0)
+                        .map(p => ({
+                            id: p.id,
+                            points: [{ name: 'ตำแหน่งปัจจุบัน', current: true }, { name: p.name, lat: p.lat, lng: p.lng }],
+                            legs: [Number(p.km)]
+                        }));
+                    if (savedRoutes.length) saveRoutes();
+                }
+            } catch (e) { savedRoutes = []; }
+        }
+        function saveRoutes() {
+            try { localStorage.setItem(ROUTES_KEY, JSON.stringify(savedRoutes)); } catch (e) { /* ไม่มีที่เก็บ ก็ใช้งานต่อได้ */ }
+        }
+
+        function mapEmbedUrl(lat, lng, zoom) {
+            return `https://www.google.com/maps?q=${lat},${lng}&z=${zoom || 15}&output=embed`;
+        }
+        function mapOpenUrl(lat, lng) {
+            return `https://www.google.com/maps?q=${lat},${lng}`;
+        }
+
+        function haversineKm(a, b) {
+            const R = 6371, rad = d => d * Math.PI / 180;
+            const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+            const x = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+            return 2 * R * Math.asin(Math.sqrt(x));
+        }
+
+        // อ่านพิกัด/ชื่อจากลิงก์ Google Maps หรือข้อความพิกัด
+        function parseGoogleInput(raw) {
+            const text = (raw || '').trim();
+            if (!text) return { error: 'ยังไม่ได้ใส่ลิงก์หรือพิกัด' };
+
+            const num = '(-?\\d{1,3}(?:\\.\\d+)?)';
+            const plain = text.match(new RegExp('^' + num + '\\s*[,\\s]\\s*' + num + '$'));
+            let lat, lng, name = '';
+
+            if (plain) {
+                lat = parseFloat(plain[1]); lng = parseFloat(plain[2]);
+            } else {
+                let url;
+                try { url = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + text); }
+                catch (e) { return { error: 'อ่านไม่ออก ลองวางลิงก์เต็มจาก Google Maps หรือพิมพ์พิกัดแบบ 16.4322, 102.8236' }; }
+
+                const host = url.hostname.toLowerCase();
+                if (host === 'maps.app.goo.gl' || host === 'goo.gl' || host.endsWith('.goo.gl')) {
+                    return { error: 'ลิงก์แบบสั้นดึงข้อมูลอัตโนมัติไม่ได้ ให้เปิดลิงก์ในเบราว์เซอร์ก่อน แล้วคัดลอกลิงก์เต็มจากแถบที่อยู่ หรือคัดลอกพิกัดมาวางแทน' };
+                }
+                if (!/(^|\.)google\.[a-z.]+$/.test(host)) {
+                    return { error: 'ลิงก์นี้ไม่ใช่ลิงก์ Google Maps' };
+                }
+
+                let decoded = text;
+                try { decoded = decodeURIComponent(text); } catch (e) { /* ใช้ข้อความเดิม */ }
+
+                const patterns = [
+                    new RegExp('!3d' + num + '!4d' + num),                       // หมุดสถานที่ (แม่นที่สุด)
+                    new RegExp('@' + num + ',' + num),                           // ศูนย์กลางแผนที่
+                    new RegExp('[?&](?:q|ll|query|destination|center)=' + num + '[,+ ]\\s*' + num)
+                ];
+                for (const p of patterns) {
+                    const m = decoded.match(p);
+                    if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); break; }
+                }
+                const nm = decoded.match(/\/place\/([^\/@?]+)/);
+                if (nm) name = nm[1].replace(/\+/g, ' ').trim();
+                if (!name) {
+                    const q = url.searchParams.get('q') || url.searchParams.get('query') || '';
+                    if (q && !new RegExp('^' + num + '\\s*[,\\s]\\s*' + num + '$').test(q)) name = q.trim();
+                }
+                if (lat === undefined) {
+                    return { error: 'ไม่พบพิกัดในลิงก์นี้ ลองคัดลอกลิงก์ของสถานที่จริง ๆ (ไม่ใช่ผลการค้นหา) หรือพิมพ์พิกัดเอง' };
+                }
+            }
+            if (!(lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180)) return { error: 'พิกัดไม่ถูกต้อง (ละติจูด -90 ถึง 90, ลองจิจูด -180 ถึง 180)' };
+            return { lat, lng, name };
+        }
+
+        function pointCoords(p) {
+            if (!p) return null;
+            if (p.current) return state.originCoords || null;
+            return (typeof p.lat === 'number' && typeof p.lng === 'number') ? { lat: p.lat, lng: p.lng } : null;
+        }
+
+        // ลิงก์เปิดเส้นทางใน Google Maps (ใช้เช็กระยะทางจริง) ต้องมีพิกัดปลายทาง
+        function directionsUrl(points) {
+            const dest = pointCoords(points[points.length - 1]);
+            if (!dest) return null;
+            const q = new URLSearchParams({ api: '1', destination: dest.lat + ',' + dest.lng, travelmode: 'two-wheeler' });
+            const first = points[0];
+            if (!first.current) {
+                const o = pointCoords(first);
+                if (!o) return null;
+                q.set('origin', o.lat + ',' + o.lng);
+            }
+            const wps = points.slice(1, -1).map(pointCoords).filter(Boolean).map(c => c.lat + ',' + c.lng);
+            if (wps.length) q.set('waypoints', wps.join('|'));
+            return 'https://www.google.com/maps/dir/?' + q.toString();
+        }
+
+        // ---------- ตัวสร้างเส้นทาง ----------
+        function newDraft() {
+            return {
+                points: [
+                    { current: true, name: 'ตำแหน่งปัจจุบัน', input: '', msg: '' },
+                    { name: '', lat: null, lng: null, input: '', msg: '' }
+                ],
+                legs: [{ km: '', manual: false }]
+            };
+        }
+
+        function openRouteBuilder() {
+            draft = newDraft();
+            document.getElementById('routeBuilder').classList.remove('hidden');
+            document.getElementById('addRouteBtn').classList.add('hidden');
+            document.getElementById('builderMsg').textContent = '';
+            recomputeLegs();
+            renderBuilder();
+        }
+        function closeRouteBuilder() {
+            draft = null;
+            document.getElementById('routeBuilder').classList.add('hidden');
+            document.getElementById('addRouteBtn').classList.remove('hidden');
+        }
+
+        function recomputeLegs() {
+            if (!draft) return;
+            draft.legs.forEach((leg, i) => {
+                if (leg.manual) return;
+                const a = pointCoords(draft.points[i]), b = pointCoords(draft.points[i + 1]);
+                leg.km = (a && b) ? Math.round(haversineKm(a, b) * DETOUR_FACTOR * 10) / 10 : '';
+            });
+        }
+
+        function legTagText(i) {
+            const leg = draft.legs[i];
+            if (leg.manual) return 'กรอกเอง';
+            return leg.km === '' ? 'กรอกระยะทางเอง' : 'ประมาณจากเส้นตรง × 1.3';
+        }
+
+        function updateBuilderSummary() {
+            if (!draft) return;
+            const total = draft.legs.reduce((s, l) => s + (parseFloat(l.km) > 0 ? parseFloat(l.km) : 0), 0);
+            document.getElementById('builderTotal').textContent = total.toFixed(1);
+            const a = document.getElementById('builderMapsLink');
+            const url = directionsUrl(draft.points);
+            if (url) { a.href = url; a.classList.remove('hidden'); } else { a.classList.add('hidden'); }
+        }
+
+        function renderBuilder() {
+            const box = document.getElementById('routePointsList');
+            if (!box || !draft) return;
+            const n = draft.points.length;
+            let html = '';
+
+            draft.points.forEach((p, i) => {
+                const isStart = i === 0, isEnd = i === n - 1;
+                const label = isStart ? 'จุดเริ่มต้น' : isEnd ? 'ปลายทาง' : 'จุดแวะที่ ' + i;
+                const badge = isStart ? 'A' : isEnd ? 'B' : String(i);
+                const badgeCls = isStart ? 'bg-navy-900 text-surface-white'
+                    : isEnd ? 'bg-gold-500 text-navy-950'
+                    : 'bg-surface-white text-navy-900 border border-navy-700';
+
+                let ctrls = '';
+                if (!isStart && !isEnd) {
+                    ctrls = '<div class="flex items-center gap-1">' +
+                        `<button type="button" class="stop-ctl" onclick="moveStop(${i},-1)" ${i === 1 ? 'disabled' : ''} aria-label="เลื่อนขึ้น">↑</button>` +
+                        `<button type="button" class="stop-ctl" onclick="moveStop(${i},1)" ${i === n - 2 ? 'disabled' : ''} aria-label="เลื่อนลง">↓</button>` +
+                        `<button type="button" class="stop-ctl" onclick="removeStop(${i})" aria-label="ลบจุดแวะ">✕</button>` +
+                        '</div>';
+                }
+
+                const msgCls = p.msgErr ? 'text-navy-900 font-semibold' : 'text-navy-500';
+                let body;
+                if (p.current) {
+                    const c = state.originCoords;
+                    body = `<div class="text-sm text-navy-700">ใช้ตำแหน่ง GPS ปัจจุบัน ${c
+                        ? `<span class="font-digital">(${c.lat.toFixed(4)}, ${c.lng.toFixed(4)})</span>`
+                        : '<span class="text-navy-500">(ยังไม่ได้ดึงพิกัด)</span>'}</div>` +
+                        `<div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="builderGetGps()" class="${BTN_OUTLINE}">ดึงพิกัด GPS</button>
+                            <button type="button" onclick="setStartCustom()" class="${BTN_OUTLINE}">เริ่มจากที่อื่น</button>
+                        </div>` +
+                        (p.msg ? `<p class="text-xs ${msgCls}">${esc(p.msg)}</p>` : '');
+                } else {
+                    const c = pointCoords(p);
+                    const coordLine = c
+                        ? `<div class="text-xs text-navy-500 font-digital">${c.lat}, ${c.lng} · <a class="underline font-sans" href="${esc(mapOpenUrl(c.lat, c.lng))}" target="_blank" rel="noopener">เปิดใน Google Maps</a></div>`
+                        : '';
+                    body = `<div class="flex flex-col sm:flex-row gap-2">
+                            <input id="pin_${i}" type="text" inputmode="url" autocomplete="off" value="${esc(p.input)}"
+                                placeholder="วางลิงก์ Google Maps หรือพิมพ์พิกัด เช่น 16.4322, 102.8236"
+                                oninput="draftSet(${i},'input',this.value)"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault();parsePoint(${i});}"
+                                class="flex-1 min-w-0 bg-surface-white text-navy-900 text-base px-3 py-2.5 rounded-lg border-2 border-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-500">
+                            <button type="button" onclick="parsePoint(${i})" class="bg-navy-900 hover:bg-navy-800 text-surface-white font-semibold text-sm px-5 py-2.5 rounded-lg transition">ดึงข้อมูล</button>
+                        </div>
+                        <input type="text" maxlength="60" value="${esc(p.name)}" placeholder="ชื่อสถานที่ (ตั้งเองได้)"
+                            oninput="draftSet(${i},'name',this.value)"
+                            class="w-full bg-surface-white text-navy-900 text-base px-3 py-2 rounded-lg border border-surface-border focus:outline-none focus:ring-2 focus:ring-gold-500">
+                        ${coordLine}
+                        <p class="text-xs ${msgCls}">${esc(p.msg || 'ไม่มีลิงก์? ตั้งชื่อเอง แล้วกรอกระยะทางช่วงนี้ด้านล่างได้เลย')}</p>` +
+                        (isStart ? `<button type="button" onclick="setStartCurrent()" class="${BTN_OUTLINE}">ใช้ตำแหน่ง GPS ปัจจุบัน</button>` : '');
+                }
+
+                html += `<div class="rounded-lg border border-surface-border bg-surface-white p-3 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-full flex items-center justify-center text-sm font-digital font-bold ${badgeCls}">${badge}</span>
+                            <span class="text-sm font-bold text-navy-900">${label}</span>
+                        </div>
+                        ${ctrls}
+                    </div>
+                    ${body}
+                </div>`;
+
+                if (i < n - 1) {
+                    const leg = draft.legs[i];
+                    const both = pointCoords(draft.points[i]) && pointCoords(draft.points[i + 1]);
+                    html += `<div class="flex flex-wrap items-center gap-2 pl-4 py-1.5 text-sm text-navy-700">
+                        <span aria-hidden="true">↓</span><span>ระยะทางช่วงนี้</span>
+                        <input type="number" min="0" step="0.1" inputmode="decimal" value="${esc(leg.km)}" oninput="setLegKm(${i},this.value)"
+                            class="w-24 text-center bg-surface-white text-navy-900 font-digital font-bold text-base px-2 py-1 rounded-lg border-2 border-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-500">
+                        <span class="font-bold">กม.</span>
+                        <span id="legTag_${i}" class="text-xs text-navy-500">${esc(legTagText(i))}</span>
+                        ${both ? `<button type="button" onclick="resetLeg(${i})" class="text-xs underline text-navy-500">คำนวณใหม่</button>` : ''}
+                    </div>`;
+                }
+            });
+
+            box.innerHTML = html;
+            updateBuilderSummary();
+        }
+
+        function draftSet(i, key, val) {
+            if (draft && draft.points[i]) draft.points[i][key] = val;
+        }
+
+        function setLegKm(i, val) {
+            if (!draft || !draft.legs[i]) return;
+            draft.legs[i].km = val;
+            draft.legs[i].manual = val !== '';
+            const tag = document.getElementById('legTag_' + i);
+            if (tag) tag.textContent = legTagText(i);
+            updateBuilderSummary();
+        }
+
+        function resetLeg(i) {
+            if (!draft || !draft.legs[i]) return;
+            draft.legs[i].manual = false;
+            recomputeLegs();
+            renderBuilder();
+        }
+
+        function parsePoint(i) {
+            if (!draft) return;
+            const p = draft.points[i];
+            const r = parseGoogleInput(p.input);
+            if (r.error) { p.msg = r.error; p.msgErr = true; renderBuilder(); return; }
+            p.lat = +r.lat.toFixed(6);
+            p.lng = +r.lng.toFixed(6);
+            if (r.name && (!p.name.trim() || p.name === p.autoName)) p.name = r.name;
+            p.autoName = r.name || '';
+            p.msg = r.name ? 'พบสถานที่แล้ว ตรวจชื่อก่อนบันทึกได้' : 'พบพิกัดแล้ว ตั้งชื่อสถานที่ได้เลย';
+            p.msgErr = false;
+            recomputeLegs();
+            renderBuilder();
+        }
+
+        function builderGetGps() {
+            if (!draft) return;
+            const p0 = draft.points[0];
+            if (!navigator.geolocation) { p0.msg = 'อุปกรณ์นี้ไม่รองรับ GPS กรอกระยะทางช่วงแรกเองได้เลย'; p0.msgErr = true; renderBuilder(); return; }
+            p0.msg = 'กำลังดึงตำแหน่งปัจจุบัน...'; p0.msgErr = false;
+            renderBuilder();
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    state.originCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    if (draft) { draft.points[0].msg = ''; recomputeLegs(); renderBuilder(); }
+                },
+                () => {
+                    if (!draft) return;
+                    draft.points[0].msg = 'ดึงตำแหน่งไม่ได้ (ไม่ได้อนุญาตหรือไม่ได้ใช้ HTTPS) เลือก "เริ่มจากที่อื่น" หรือกรอกระยะทางเองได้';
+                    draft.points[0].msgErr = true;
+                    renderBuilder();
+                },
+                { timeout: 8000 }
+            );
+        }
+
+        // เรียกจาก detectGPSLocation เมื่อได้พิกัดใหม่
+        function onOriginUpdated() {
+            if (!draft) return;
+            recomputeLegs();
+            renderBuilder();
+        }
+
+        function setStartCustom() {
+            if (!draft) return;
+            draft.points[0] = { name: '', lat: null, lng: null, input: '', msg: '' };
+            draft.legs[0].manual = false;
+            recomputeLegs();
+            renderBuilder();
+        }
+        function setStartCurrent() {
+            if (!draft) return;
+            draft.points[0] = { current: true, name: 'ตำแหน่งปัจจุบัน', input: '', msg: '' };
+            draft.legs[0].manual = false;
+            recomputeLegs();
+            renderBuilder();
+        }
+
+        function addStop() {
+            if (!draft) return;
+            const idx = draft.points.length - 1;                       // แทรกก่อนปลายทาง
+            draft.points.splice(idx, 0, { name: '', lat: null, lng: null, input: '', msg: '' });
+            draft.legs.splice(idx, 0, { km: '', manual: false });
+            draft.legs[idx - 1].manual = false;
+            recomputeLegs();
+            renderBuilder();
+            setTimeout(() => { const el = document.getElementById('pin_' + idx); if (el) el.focus(); }, 30);
+        }
+
+        function removeStop(i) {
+            if (!draft || i < 1 || i > draft.points.length - 2) return;
+            draft.points.splice(i, 1);
+            draft.legs.splice(i, 1);
+            draft.legs[i - 1] = { km: '', manual: false };
+            recomputeLegs();
+            renderBuilder();
+        }
+
+        function moveStop(i, dir) {
+            if (!draft) return;
+            const j = i + dir, n = draft.points.length;
+            if (i < 1 || i > n - 2 || j < 1 || j > n - 2) return;
+            [draft.points[i], draft.points[j]] = [draft.points[j], draft.points[i]];
+            const lo = Math.min(i, j), hi = Math.max(i, j);
+            for (let k = lo - 1; k <= hi; k++) draft.legs[k] = { km: '', manual: false };
+            recomputeLegs();
+            renderBuilder();
+        }
+
+        function saveRoute() {
+            if (!draft) return;
+            const msg = document.getElementById('builderMsg');
+            const n = draft.points.length;
+
+            for (let i = 0; i < n; i++) {
+                const p = draft.points[i];
+                if (!p.current && !p.name.trim() && typeof p.lat !== 'number') {
+                    msg.textContent = 'ใส่ชื่อหรือวางลิงก์ให้ครบทุกจุด (จุดที่ยังว่างอยู่คือ ' + (i === 0 ? 'จุดเริ่มต้น' : i === n - 1 ? 'ปลายทาง' : 'จุดแวะที่ ' + i) + ')';
+                    return;
+                }
+            }
+            for (let i = 0; i < draft.legs.length; i++) {
+                if (!(parseFloat(draft.legs[i].km) > 0)) {
+                    msg.textContent = 'กรอกระยะทางให้ครบทุกช่วง (ช่วงที่ ' + (i + 1) + ' ยังไม่มีตัวเลข)';
+                    return;
+                }
+            }
+
+            const points = draft.points.map((p, i) => {
+                if (p.current) return { name: 'ตำแหน่งปัจจุบัน', current: true };
+                const o = { name: p.name.trim() || (i === n - 1 ? 'ปลายทาง' : 'จุดแวะ ' + i) };
+                if (typeof p.lat === 'number') { o.lat = p.lat; o.lng = p.lng; }
+                return o;
+            });
+            const route = {
+                id: Date.now().toString(36),
+                points,
+                legs: draft.legs.map(l => Math.round(parseFloat(l.km) * 10) / 10)
+            };
+            savedRoutes.push(route);
+            saveRoutes();
+            schedulePush();
+            closeRouteBuilder();
+            renderSavedRoutes();
+            selectRoute(route.id);
+        }
+
+        // ---------- เส้นทางที่บันทึกไว้ ----------
+        function routeTitle(r) { return r.points.map(p => p.name).join(' ➔ '); }
+        function routeTotal(r) { return Math.round(r.legs.reduce((s, k) => s + k, 0) * 10) / 10; }
+
+        function selectRoute(id) {
+            const r = savedRoutes.find(x => x.id === id);
+            if (!r) return;
+            const legs = r.legs.map((km, i) => ({ from: r.points[i].name, to: r.points[i + 1].name, km }));
+            selectPresetRoute('route_' + id, routeTotal(r), routeTitle(r), legs);
+        }
+
+        function removeRoute(id) {
+            const r = savedRoutes.find(x => x.id === id);
+            if (!r || !confirm('ลบเส้นทาง "' + routeTitle(r) + '" ?')) return;
+            savedRoutes = savedRoutes.filter(x => x.id !== id);
+            saveRoutes();
+            lsSet(DELETED_KEY, Array.from(new Set([...lsGet(DELETED_KEY, []), id])).slice(-200));
+            schedulePush();
+            renderSavedRoutes();
+            if (state.routeKey === 'route_' + id) {
+                selectPresetRoute('msu_kk_home', 156.5, 'หอขวัญจิรา (มมส.) ➔ ลีเพลส ขอนแก่น ➔ บ้านโนนหัน');
+            } else {
+                updateAllCalculations();
+            }
+        }
+
+        function renderSavedRoutes() {
+            const list = document.getElementById('savedRoutesList');
+            if (!list) return;
+            const trash = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
+            const sideBtn = 'flex-1 flex items-center justify-center px-3 rounded-xl border border-surface-border bg-surface-white text-navy-500 hover:text-navy-900 hover:border-navy-700 transition';
+            list.innerHTML = savedRoutes.map(r => {
+                const stops = r.points.length - 2;
+                const url = directionsUrl(r.points);
+                const id = esc(r.id);
+                return `<div class="saved-route flex items-stretch gap-2" data-id="${id}">
+                    <button type="button" class="saved-route-pick flex-1 min-w-0 p-3 rounded-xl border text-left transition flex items-center justify-between gap-2" onclick="selectRoute('${id}')">
+                        <div class="min-w-0">
+                            <div class="text-sm sm:text-base font-bold">${esc(routeTitle(r))}</div>
+                            <div class="text-xs opacity-75">${stops > 0 ? 'แวะ ' + stops + ' จุด · ' : 'ไม่มีจุดแวะ · '}${r.legs.map(k => k.toFixed(1)).join(' + ')} กม.</div>
+                        </div>
+                        <span class="font-digital font-bold text-base px-2.5 py-1 rounded bg-surface-subtle text-navy-900 shrink-0">${routeTotal(r).toFixed(1)} กม.</span>
+                    </button>
+                    <div class="flex flex-col gap-1 shrink-0">
+                        ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" class="${sideBtn} text-xs font-semibold" title="เปิดเส้นทางใน Google Maps">แผนที่</a>` : ''}
+                        <button type="button" class="${sideBtn}" aria-label="ลบเส้นทาง" onclick="removeRoute('${id}')">${trash}</button>
+                    </div>
+                </div>`;
+            }).join('');
+            styleSavedRoutes();
+        }
+
+        function styleSavedRoutes() {
+            document.querySelectorAll('#savedRoutesList .saved-route').forEach(row => {
+                const pick = row.querySelector('.saved-route-pick');
+                const on = state.routeKey === 'route_' + row.dataset.id;
+                pick.className = 'saved-route-pick flex-1 min-w-0 p-3 rounded-xl border text-left transition flex items-center justify-between gap-2 ' +
+                    (on ? 'border-2 border-navy-900 bg-navy-900/5 text-navy-900'
+                        : 'border-surface-border bg-surface-subtle hover:bg-surface-white hover:border-navy-700 text-navy-900');
+            });
+        }
+
+        // ---------- น้ำมันเหลือแต่ละจุดตลอดเส้นทาง ----------
+        // ช่วงที่ใช้จริง: ถ้าเลือกไป-กลับ จะต่อขากลับ (ย้อนลำดับ) เข้าไปด้วย
+        function effectiveLegs() {
+            if (state.routeKey === 'custom' || !state.routeLegs || !state.routeLegs.length) return null;
+            let legs = state.routeLegs.map(l => ({ from: l.from, to: l.to, km: l.km }));
+            if (state.tripMultiplier === 2) {
+                const back = state.routeLegs.slice().reverse().map(l => ({ from: l.to, to: l.from, km: l.km }));
+                legs = legs.concat(back);
+            }
+            return legs;
+        }
+
+        function renderLegBreakdown(startLiters) {
+            const box = document.getElementById('legBreakdown');
+            if (!box) return;
+            const legs = effectiveLegs();
+            if (!legs || legs.length < 2) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden');
+
+            const rows = [{ name: legs[0].from, km: 0, fuel: startLiters }];
+            let cum = 0, failName = '';
+            const outboundCount = state.routeLegs.length;
+            legs.forEach((l, idx) => {
+                cum += l.km;
+                const fuel = startLiters - cum / state.kml;
+                const isReturn = state.tripMultiplier === 2 && idx >= outboundCount;
+                rows.push({ name: (isReturn ? 'กลับ: ' : '') + l.to, km: cum, fuel });
+                if (!failName && fuel <= 0) failName = (isReturn ? 'ขากลับ ' : '') + l.to;
+            });
+
+            document.getElementById('legBreakdownList').innerHTML = rows.map((r, i) => {
+                const out = r.fuel <= 0;
+                const low = !out && r.fuel < RESERVE_TRIP_F_LITERS;
+                const cls = out ? 'bg-navy-900 text-surface-white border-navy-900'
+                    : low ? 'bg-gold-50 border-gold-500 text-navy-900'
+                    : 'bg-surface-subtle border-surface-border text-navy-900';
+                const sub = out ? 'text-surface-subtle' : 'text-navy-500';
+                const right = out ? 'ไม่ถึงจุดนี้' : `${r.fuel.toFixed(2)} L · ${getBarText(litersToBars(r.fuel), r.fuel)}`;
+                return `<div class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 ${cls}">
+                    <div class="min-w-0">
+                        <div class="text-sm font-semibold truncate">${i === 0 ? 'เริ่มที่ ' : ''}${esc(r.name)}</div>
+                        <div class="text-xs font-digital ${sub}">${r.km.toFixed(1)} กม.</div>
+                    </div>
+                    <div class="text-sm font-digital font-bold shrink-0 text-right">${right}</div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('legBreakdownNote').textContent = failName
+                ? `น้ำมันจะหมดก่อนถึง "${failName}" ต้องแวะเติมก่อนช่วงนั้น`
+                : 'คำนวณจากน้ำมันหลังเติม ณ จุดเริ่มต้น และอัตราสิ้นเปลืองที่ตั้งไว้ (ไม่รวมการเติมระหว่างทาง)';
+        }
+
+        // ============================================================================
+        // SECTION 4: ROUTE & DISTANCE CONTROLS
+        // ============================================================================
+        function selectPresetRoute(routeKey, baseKm, title, legs) {
+            state.routeLegs = legs || PRESET_LEGS[routeKey] || null;
+            state.routeKey = routeKey;
+            state.baseRouteKm = baseKm;
+            state.routeTitle = title;
+            state.totalTripKm = +(baseKm * state.tripMultiplier).toFixed(1);
+            document.getElementById('customDistanceInput').value = state.totalTripKm;
+            updateAllCalculations();
+        }
+
+        function setTripMultiplier(mult) {
+            state.tripMultiplier = mult;
+            state.totalTripKm = +(state.baseRouteKm * state.tripMultiplier).toFixed(1);
+            document.getElementById('customDistanceInput').value = state.totalTripKm;
+            updateAllCalculations();
+        }
+
+        function handleCustomDistanceInput(val) {
+            const num = parseFloat(val);
+            state.routeKey = 'custom';
+            state.routeTitle = 'กำหนดระยะทางเอง';
+            state.totalTripKm = isNaN(num) || num <= 0 ? 0 : num;
+            updateAllCalculations();
+        }
+
+        function styleRouteButtons() {
+            const routeIds = ['msu_kk_home', 'msu_kk', 'kk_home', 'city_errands'];
+            routeIds.forEach(id => {
+                const btn = document.getElementById(`routeBtn_${id}`);
+                if (!btn) return;
+                if (state.routeKey === id) {
+                    btn.className = 'route-btn w-full p-3 rounded-xl border-2 border-navy-900 bg-navy-900/5 text-navy-900 text-left transition flex items-center justify-between gap-2 shadow-sm';
+                } else {
+                    btn.className = 'route-btn w-full p-3 rounded-xl border border-surface-border bg-surface-subtle hover:bg-surface-white hover:border-navy-700 text-navy-900 text-left transition flex items-center justify-between gap-2';
+                }
+            });
+
+            // One-way vs Round-trip buttons
+            const m1 = document.getElementById('tripMult_1');
+            const m2 = document.getElementById('tripMult_2');
+            if (state.tripMultiplier === 1) {
+                m1.className = 'py-2 px-3 rounded-lg font-bold text-sm border-2 border-navy-900 bg-navy-900/5 text-navy-900 transition';
+                m2.className = 'py-2 px-3 rounded-lg font-bold text-sm border border-surface-border bg-surface-white text-navy-700 hover:border-navy-700 transition';
+            } else {
+                m2.className = 'py-2 px-3 rounded-lg font-bold text-sm border-2 border-navy-900 bg-navy-900/5 text-navy-900 transition';
+                m1.className = 'py-2 px-3 rounded-lg font-bold text-sm border border-surface-border bg-surface-white text-navy-700 hover:border-navy-700 transition';
+            }
+        }
+
+        // ============================================================================
+        // MASTER SYNCHRONIZATION ENGINE (UPDATES ALL SECTIONS INSTANTLY)
+        // ============================================================================
+        function updateAllCalculations() {
+            const pricePerLiter = getActiveFuelPrice();
+
+            // 1. Current Fuel State
+            const startLiters = state.currentLiters;
+            const startBars = state.currentBars;
+            const startRangeKm = Math.round(startLiters * state.kml);
+
+            // 2. After Refueling State
+            const rawAddedLiters = pricePerLiter > 0 ? (state.refuelBaht / pricePerLiter) : 0;
+            const totalAfterRefuelLiters = Math.min(TANK_CAPACITY, +(startLiters + rawAddedLiters).toFixed(2));
+            const effectiveAddedLiters = +(totalAfterRefuelLiters - startLiters).toFixed(2);
+            const afterRefuelBars = litersToBars(totalAfterRefuelLiters);
+            const afterRefuelRangeKm = Math.round(totalAfterRefuelLiters * state.kml);
+
+            // Update Full Tank button label dynamically
+            const neededForFullLiters = Math.max(0, TANK_CAPACITY - startLiters);
+            const neededForFullBaht = Math.ceil(neededForFullLiters * pricePerLiter);
+            document.getElementById('fullTankBtnLabel').textContent = `เติมเต็มถัง (~${neededForFullBaht}฿)`;
+
+            // 3. Destination State
+            const fuelNeededForTrip = +(state.totalTripKm / state.kml).toFixed(2);
+            const remainingAtDestLiters = +(totalAfterRefuelLiters - fuelNeededForTrip).toFixed(2);
+            const clampedDestLiters = Math.max(0, remainingAtDestLiters);
+            const destBars = litersToBars(remainingAtDestLiters);
+            const destRemainingRangeKm = Math.max(0, Math.round(remainingAtDestLiters * state.kml));
+
+            // --- UPDATE HEADER ROUTE STRIP (ปลายทาง) ---
+            let destName;
+            if (state.routeKey === 'custom') {
+                destName = 'ตามระยะทางที่กรอก';
+            } else {
+                const parts = state.routeTitle.split('➔');
+                destName = parts.length > 1 ? parts[parts.length - 1].trim() : 'วนในพื้นที่';
+            }
+            if (state.tripMultiplier === 2) destName += ' (ไป-กลับ)';
+            const destEl = document.getElementById('headerDestText');
+            if (destEl) destEl.textContent = destName;
+
+            // --- UPDATE TOP DIGITAL METER ---
+            document.getElementById('meterKmlBadge').textContent = state.kml.toFixed(1);
+
+            // Stage 1
+            document.getElementById('stage1StatusBadge').textContent = getBarText(startBars, startLiters);
+            document.getElementById('stage1Liters').textContent = startLiters.toFixed(2);
+            document.getElementById('stage1Range').textContent = startRangeKm;
+            renderSixBarGauge('gaugeStage1', startBars, true, false);
+
+            // Stage 2
+            document.getElementById('stage2StatusBadge').textContent = `+${state.refuelBaht} ฿ (${getBarText(afterRefuelBars, totalAfterRefuelLiters)})`;
+            document.getElementById('stage2Liters').textContent = totalAfterRefuelLiters.toFixed(2);
+            document.getElementById('stage2Range').textContent = afterRefuelRangeKm;
+            renderSixBarGauge('gaugeStage2', afterRefuelBars, false, false);
+
+            // Stage 3
+            const isOut = remainingAtDestLiters <= 0;
+            document.getElementById('stage3StatusBadge').textContent = isOut
+                ? 'น้ำมันไม่พอ!'
+                : `เหลือ ${getBarText(destBars, remainingAtDestLiters)}`;
+            document.getElementById('stage3Liters').textContent = clampedDestLiters.toFixed(2);
+            document.getElementById('stage3Range').textContent = destRemainingRangeKm;
+            renderSixBarGauge('gaugeStage3', Math.max(0, destBars), false, isOut);
+
+            // --- UPDATE SECTION 1 ---
+            renderBarSelectorButtons();
+            const currentLevelObj = XMAX_BAR_LEVELS.find(x => x.bars === startBars) || XMAX_BAR_LEVELS[0];
+            document.getElementById('sec1SelectedLabel').textContent = currentLevelObj.label;
+            document.getElementById('sec1SelectedLiters').textContent = startLiters.toFixed(1);
+            document.getElementById('sec1SelectedRange').textContent = startRangeKm;
+
+            // --- UPDATE SECTION 2 ---
+            renderFuelTypeCards();
+            document.getElementById('activePricePerLiterDisplay').textContent = pricePerLiter.toFixed(2);
+            document.getElementById('calcAddedLiters').textContent = effectiveAddedLiters.toFixed(2);
+            document.getElementById('calcTotalLiters').textContent = totalAfterRefuelLiters.toFixed(2);
+            document.getElementById('calcNewBarsText').textContent = `(${getBarText(afterRefuelBars, totalAfterRefuelLiters)})`;
+            document.getElementById('calcTotalRange').textContent = afterRefuelRangeKm;
+
+            // Highlight Baht Preset buttons
+            document.querySelectorAll('.baht-preset-btn').forEach(btn => {
+                const txt = btn.textContent;
+                const matchNum = txt.includes('0฿') && !txt.includes('00') ? 0 : parseInt(txt.replace(/\D/g, ''), 10);
+                if (matchNum === state.refuelBaht) {
+                    btn.className = 'baht-preset-btn text-sm font-bold px-3 py-2 sm:py-1.5 rounded-lg border-2 border-navy-900 bg-navy-900/5 text-navy-900 transition';
+                } else {
+                    btn.className = 'baht-preset-btn text-sm font-semibold px-3 py-2 sm:py-1.5 rounded-lg border border-surface-border bg-surface-white text-navy-800 hover:border-navy-700 transition';
+                }
+            });
+
+            // --- UPDATE SECTION 3 ---
+            styleKmlPresetButtons();
+
+            // --- UPDATE SECTION 4 & 5 ---
+            styleRouteButtons();
+            styleSavedRoutes();
+            const suffix = state.tripMultiplier === 2 ? ' (ไป-กลับ x2)' : '';
+            document.getElementById('verdictRouteTitle').textContent = `${state.routeTitle}${suffix}`;
+            document.getElementById('sumTripDistance').textContent = state.totalTripKm.toFixed(1);
+            document.getElementById('sumFuelNeeded').textContent = fuelNeededForTrip.toFixed(2);
+            document.getElementById('sumTripCostBaht').textContent = Math.round(fuelNeededForTrip * pricePerLiter);
+            document.getElementById('sumRemainingLiters').textContent = clampedDestLiters.toFixed(2);
+            document.getElementById('sumRemainingBars').textContent = `(${getBarText(destBars, remainingAtDestLiters)})`;
+            renderLegBreakdown(totalAfterRefuelLiters);
+
+            // Calculate minimum safe top-up (so user arrives with at least 1.5L reserve)
+            const targetTotalLiters = fuelNeededForTrip + RESERVE_TRIP_F_LITERS;
+            const minLitersToAdd = Math.max(0, targetTotalLiters - startLiters);
+            const minBahtRecommended = Math.ceil((minLitersToAdd * pricePerLiter) / 10) * 10;
+
+            const banner = document.getElementById('verdictMainBanner');
+            const headline = document.getElementById('verdictHeadline');
+            const subtext = document.getElementById('verdictSubtext');
+            const icon = document.getElementById('verdictIcon');
+            const adviceEl = document.getElementById('minTopupAdvice');
+
+            if (remainingAtDestLiters >= RESERVE_TRIP_F_LITERS) {
+                applyVerdictStyle('ok', `เหลือ ${clampedDestLiters.toFixed(2)} ลิตร (${getBarText(destBars, remainingAtDestLiters)})`);
+                headline.textContent = 'น้ำมันเพียงพอ เดินทางถึงปลายทางสบาย!';
+                subtext.textContent = `เมื่อถึงปลายทางจะเหลือน้ำมัน ${remainingAtDestLiters.toFixed(2)} ลิตร (${getBarText(destBars, remainingAtDestLiters)}) ขี่ต่อได้อีกประมาณ ${destRemainingRangeKm} กม. โดยไฟยังไม่กะพริบ`;
+                adviceEl.textContent = minBahtRecommended > 0
+                    ? `เติมขั้นต่ำ ~${minBahtRecommended} บาท ก็เพียงพอแบบไม่ติดไฟกะพริบ`
+                    : 'น้ำมันเดิมในถังเพียงพอสำหรับทริปนี้โดยไม่ต้องเติมเพิ่ม';
+            } else if (remainingAtDestLiters > 0) {
+                applyVerdictStyle('warn', `เหลือ ${clampedDestLiters.toFixed(2)} ลิตร (ติดไฟกะพริบ)`);
+                headline.textContent = 'ถึงปลายทางแบบฉิวเฉียด (ติดไฟกะพริบ Trip F)';
+                subtext.textContent = `เหลือน้ำมันก้นถังเพียง ${remainingAtDestLiters.toFixed(2)} ลิตร แนะนำให้เติมเพิ่มอีกนิดเพื่อถนอมปั๊มติ๊กและขี่สบายใจกว่า`;
+                adviceEl.textContent = `แนะนำเติมอย่างน้อย ~${minBahtRecommended} บาท เพื่อไม่ให้ไฟกะพริบระหว่างทาง`;
+            } else {
+                const shortLiters = Math.abs(remainingAtDestLiters);
+                const shortKm = Math.round(shortLiters * state.kml);
+                applyVerdictStyle('danger', `ขาดอีก ${Math.abs(remainingAtDestLiters).toFixed(2)} ลิตร`);
+                headline.textContent = `น้ำมันไม่พอ! ขาดอีก ${shortLiters.toFixed(2)} ลิตร (~${shortKm} กม.)`;
+                subtext.textContent = `ต้องแวะเติมน้ำมันเพิ่ม มิฉะนั้นรถจะดับก่อนถึงปลายทางประมาณ ${shortKm} กิโลเมตร`;
+                adviceEl.textContent = `ต้องเติมอย่างน้อย ~${minBahtRecommended} บาท จึงจะวิ่งถึงปลายทางอย่างปลอดภัย`;
+            }
+
+            persistIfChanged();
+        }
+
+        // สไตล์กล่องสรุปผล: ok = พื้นเทา+ขอบกรมท่า, warn = พื้นทองอ่อน, danger = พื้นกรมท่า
+        const VERDICT_ICONS = { ok: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>', warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>', danger: '<path d="M12 16h.01"/><path d="M12 8v4"/><path d="M15.312 2a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586l-4.688-4.688A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2z"/>' };
+        const VERDICT_STYLES = {
+            ok:     { box: 'border border-surface-border border-l-4 border-l-navy-900 bg-surface-subtle', wrap: 'bg-navy-900 text-surface-white', h: 'text-navy-900', p: 'text-navy-700' },
+            warn:   { box: 'border border-gold-500 border-l-4 bg-gold-50', wrap: 'bg-gold-500 text-navy-950 blink-warning', h: 'text-navy-900', p: 'text-navy-700' },
+            danger: { box: 'border-2 border-navy-900 bg-navy-900', wrap: 'bg-gold-500 text-navy-950 blink-warning', h: 'text-surface-white', p: 'text-surface-subtle' }
+        };
+        function applyVerdictStyle(kind, summary) {
+            document.getElementById('stickyVerdictTag').textContent = { ok: 'พอ', warn: 'ฉิวเฉียด', danger: 'ไม่พอ' }[kind];
+            document.getElementById('stickyVerdictText').textContent = summary || '';
+            const st = VERDICT_STYLES[kind];
+            document.getElementById('verdictMainBanner').className = 'rounded-xl p-4 mb-4 ' + st.box;
+            document.getElementById('verdictIconWrap').className = 'w-10 h-10 rounded-full flex items-center justify-center shrink-0 ' + st.wrap;
+            document.getElementById('verdictIcon').innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + VERDICT_ICONS[kind] + '</svg>';
+            document.getElementById('verdictHeadline').className = 'font-bold text-lg sm:text-lg ' + st.h;
+            document.getElementById('verdictSubtext').className = 'text-sm mt-0.5 leading-relaxed ' + st.p;
+        }
+
+        // เน้นขั้นที่กำลังดูอยู่ + ซ่อนแถบผลลัพธ์เมื่อเห็นสรุปผลแล้ว
+        function setupStepTracking() {
+            const chips = document.querySelectorAll('.step-chip');
+            const bar = document.getElementById('stickyVerdict');
+            const setActive = (id) => {
+                chips.forEach(c => {
+                    const on = c.dataset.step === id;
+                    c.classList.toggle('border-navy-900', on);
+                    c.classList.toggle('bg-navy-900/5', on);
+                    c.classList.toggle('text-navy-900', on);
+                    c.classList.toggle('border-surface-border', !on);
+                    c.classList.toggle('bg-surface-white', !on);
+                    c.classList.toggle('text-navy-700', !on);
+                    if (on) { const nav = c.closest('nav'); nav.scrollTo({ left: c.offsetLeft - (nav.clientWidth - c.offsetWidth) / 2, behavior: 'auto' }); }
+                });
+            };
+            // หาขั้นที่กำลังดูอยู่จากตำแหน่งการเลื่อนจริง (แม่นกว่าใช้ observer)
+            const nav = document.querySelector('nav[aria-label="ขั้นตอน"]');
+            let current = '';
+            const update = () => {
+                const refY = document.getElementById('stickyTop').offsetHeight + 24;
+                let best = null, bestTop = -Infinity;
+                for (let i = 1; i <= 5; i++) {
+                    const el = document.getElementById('step' + i);
+                    if (!el) continue;
+                    const r = el.getBoundingClientRect();
+                    if (r.top <= refY && r.bottom > refY && r.top > bestTop + 1) { best = el.id; bestTop = r.top; }
+                }
+                const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+                if (atBottom) best = 'step5';
+                if (!best) best = current || 'step1';
+                if (best !== current) { current = best; setActive(best); }
+            };
+            let ticking = false;
+            window.addEventListener('scroll', () => {
+                if (ticking) return;
+                ticking = true;
+                requestAnimationFrame(() => { update(); ticking = false; });
+            }, { passive: true });
+            window.addEventListener('resize', update);
+            update();
+            if (!('IntersectionObserver' in window)) return;
+            const io5 = new IntersectionObserver((entries) => {
+                entries.forEach(e => bar.classList.toggle('translate-y-full', e.isIntersecting));
+            }, { threshold: 0.35 });
+            const s5 = document.getElementById('step5');
+            if (s5) io5.observe(s5);
+        }
+
+        // ============================================================================
+        // จำค่าที่ตั้งไว้ + ซิงก์ข้ามเครื่อง (Google Apps Script) + PWA
+        // ============================================================================
+        const SETTINGS_KEY = 'xmaxSettings';
+        const DELETED_KEY = 'xmaxDeletedRoutes';
+        const SYNC_CFG_KEY = 'xmaxSyncCfg';
+        const DEFAULT_SYNC_URL = '';   // ใส่ URL ของ Apps Script ตรงนี้ได้ ถ้าไม่อยากวางทุกเครื่อง
+
+        const PRESETS = {
+            msu_kk_home: { km: 156.5, title: 'หอขวัญจิรา (มมส.) ➔ ลีเพลส ขอนแก่น ➔ บ้านโนนหัน' },
+            msu_kk:      { km: 58.9,  title: 'หอขวัญจิรา (มมส.) ➔ ลีเพลส ขอนแก่น' },
+            kk_home:     { km: 97.6,  title: 'ลีเพลส ขอนแก่น ➔ บ้านโนนหัน (ชุมแพ)' },
+            city_errands:{ km: 15.0,  title: 'ขี่ทำธุระในเมือง (ม.ใหม่ / ท่าขอนยาง)' }
+        };
+
+        const APPS_SCRIPT_CODE = `// XMAX 300 - ที่เก็บข้อมูลซิงก์ (Google Apps Script)
+// วางโค้ดนี้ในสคริปต์ที่ผูกกับ Google Sheets แล้ว Deploy เป็น Web app
+// (Execute as: Me, Who has access: Anyone)
+var SHEET_NAME = 'xmax_sync';
+
+function sheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_NAME);
+    sh.appendRow(['codeHash', 'json', 'updatedAt']);
+  }
+  return sh;
+}
+
+function hash_(code) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(code));
+  return bytes.map(function (b) {
+    return ('0' + (b & 0xff).toString(16)).slice(-2);
+  }).join('');
+}
+
+function out_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function findRow_(sh, h) {
+  var last = sh.getLastRow();
+  if (last < 2) return 0;
+  var vals = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    if (vals[i][0] === h) return i + 2;
+  }
+  return 0;
+}
+
+function doGet(e) {
+  var code = e && e.parameter && e.parameter.code;
+  if (!code) return out_({ ok: false, error: 'no code' });
+  var sh = sheet_();
+  var row = findRow_(sh, hash_(code));
+  if (!row) return out_({ ok: true, data: null });
+  return out_({ ok: true, data: JSON.parse(sh.getRange(row, 2).getValue()) });
+}
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var body = JSON.parse(e.postData.contents);
+    if (!body.code || !body.data) return out_({ ok: false, error: 'bad request' });
+    var json = JSON.stringify(body.data);
+    if (json.length > 45000) return out_({ ok: false, error: 'too large' });
+    var sh = sheet_();
+    var h = hash_(body.code);
+    var row = findRow_(sh, h);
+    if (row) {
+      sh.getRange(row, 2, 1, 2).setValues([[json, new Date()]]);
+    } else {
+      sh.appendRow([h, json, new Date()]);
+    }
+    return out_({ ok: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+`;
+
+        let appReady = false, applying = false, syncing = false, resyncQueued = false;
+        let lastSnapshot = '', settingsTs = 0, pushTimer = null;
+
+        function lsGet(key, fallback) {
+            try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback; } catch (e) { return fallback; }
+        }
+        function lsSet(key, val) {
+            try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* ไม่มีที่เก็บ ก็ใช้งานต่อได้ */ }
+        }
+
+        function currentSettings() {
+            return {
+                bars: state.currentBars, fuel: state.fuelTypeKey, prov: state.provinceKey,
+                baht: state.refuelBaht, kml: state.kml, routeKey: state.routeKey,
+                baseKm: state.baseRouteKm, mult: state.tripMultiplier, totalKm: state.totalTripKm
+            };
+        }
+
+        // เรียกท้าย updateAllCalculations: ถ้าค่าเปลี่ยนจริง ให้บันทึกในเครื่องและส่งขึ้นซิงก์
+        function persistIfChanged() {
+            if (!appReady) return;
+            const snap = JSON.stringify(currentSettings());
+            if (snap === lastSnapshot) return;
+            lastSnapshot = snap;
+            if (applying) return;
+            settingsTs = Date.now();
+            lsSet(SETTINGS_KEY, Object.assign({}, currentSettings(), { ts: settingsTs }));
+            schedulePush();
+        }
+
+        function applySettings(s) {
+            if (!s || typeof s !== 'object') return;
+            applying = true;
+            try {
+                const lvl = XMAX_BAR_LEVELS.find(x => x.bars === s.bars);
+                if (lvl) { state.currentBars = lvl.bars; state.currentLiters = lvl.liters; }
+                if (BASE_FUEL_PRICES[s.fuel]) state.fuelTypeKey = s.fuel;
+                if (PROVINCE_TAX[s.prov]) state.provinceKey = s.prov;
+                if (isFinite(s.baht) && s.baht >= 0) state.refuelBaht = Number(s.baht);
+                if (isFinite(s.kml) && s.kml > 5 && s.kml <= 60) state.kml = Number(s.kml);
+                document.getElementById('refuelBahtInput').value = state.refuelBaht;
+                document.getElementById('kmlNumberInput').value = state.kml;
+                document.getElementById('kmlRangeSlider').value = Math.min(45, Math.max(18, state.kml));
+                state.tripMultiplier = s.mult === 2 ? 2 : 1;
+
+                const key = s.routeKey;
+                if (typeof key === 'string' && key.indexOf('route_') === 0 && savedRoutes.some(r => 'route_' + r.id === key)) {
+                    selectRoute(key.slice(6));
+                } else if (PRESETS[key]) {
+                    selectPresetRoute(key, PRESETS[key].km, PRESETS[key].title);
+                } else if (key === 'custom' && s.totalKm > 0) {
+                    state.routeKey = 'custom';
+                    state.routeLegs = null;
+                    state.routeTitle = 'กำหนดระยะทางเอง';
+                    state.baseRouteKm = s.baseKm > 0 ? Number(s.baseKm) : Number(s.totalKm);
+                    state.totalTripKm = Number(s.totalKm);
+                    document.getElementById('customDistanceInput').value = state.totalTripKm;
+                } else {
+                    selectPresetRoute('msu_kk_home', PRESETS.msu_kk_home.km, PRESETS.msu_kk_home.title);
+                }
+                updateAllCalculations();
+            } finally {
+                applying = false;
+            }
+            lastSnapshot = JSON.stringify(currentSettings());
+        }
+
+        // ---------- ซิงก์ ----------
+        function getSyncCfg() {
+            const c = lsGet(SYNC_CFG_KEY, {});
+            return { url: (c.url || DEFAULT_SYNC_URL || '').trim(), code: (c.code || '').trim() };
+        }
+
+        function setSyncStatus(text, kind) {
+            const el = document.getElementById('syncStatus');
+            if (!el) return;
+            el.textContent = text;
+            el.className = 'text-xs font-medium px-2.5 py-1 rounded-md border ' +
+                (kind === 'ok' ? 'bg-surface-subtle border-navy-700 text-navy-900'
+                : kind === 'err' ? 'bg-gold-50 border-gold-500 text-navy-900'
+                : 'bg-surface-subtle border-surface-border text-navy-700');
+        }
+
+        function localBlob() {
+            return {
+                v: 1,
+                settings: Object.assign({}, currentSettings(), { ts: settingsTs }),
+                routes: savedRoutes,
+                deleted: lsGet(DELETED_KEY, [])
+            };
+        }
+
+        function mergeBlobs(local, remote) {
+            if (!remote || typeof remote !== 'object') return local;
+            const deleted = Array.from(new Set([].concat(local.deleted || [], remote.deleted || []))).slice(-200);
+            const map = new Map();
+            [].concat(remote.routes || [], local.routes || []).forEach(r => {
+                if (validRoute(r) && deleted.indexOf(r.id) === -1) map.set(r.id, r);
+            });
+            const sl = local.settings || {}, sr = remote.settings || {};
+            return { v: 1, settings: (sr.ts || 0) > (sl.ts || 0) ? sr : sl, routes: Array.from(map.values()), deleted };
+        }
+
+        function blobSig(b) {
+            const s = b.settings || {};
+            return JSON.stringify([
+                s.ts || 0, s.bars, s.fuel, s.prov, s.baht, s.kml, s.routeKey, s.baseKm, s.mult, s.totalKm,
+                (b.routes || []).map(r => JSON.stringify(r)).sort(),
+                (b.deleted || []).slice().sort()
+            ]);
+        }
+
+        function schedulePush() {
+            clearTimeout(pushTimer);
+            pushTimer = setTimeout(syncNow, 1500);
+        }
+
+        async function syncNow() {
+            const cfg = getSyncCfg();
+            if (!cfg.url || !cfg.code) { setSyncStatus('ยังไม่ได้ตั้งค่า'); return; }
+            if (syncing) { resyncQueued = true; return; }
+            syncing = true;
+            setSyncStatus('กำลังซิงก์...');
+            try {
+                const res = await fetch(cfg.url + (cfg.url.indexOf('?') >= 0 ? '&' : '?') + 'code=' + encodeURIComponent(cfg.code), { cache: 'no-store' });
+                const j = await res.json();
+                if (!j || !j.ok) throw new Error((j && j.error) || 'bad response');
+
+                const merged = mergeBlobs(localBlob(), j.data);
+
+                // เส้นทาง: ใช้ผลรวมของสองฝั่ง
+                savedRoutes = merged.routes;
+                saveRoutes();
+                lsSet(DELETED_KEY, merged.deleted);
+                renderSavedRoutes();
+
+                // ค่าที่ตั้งไว้: ฝั่งที่ใหม่กว่าชนะ
+                if ((merged.settings.ts || 0) > settingsTs) {
+                    settingsTs = merged.settings.ts;
+                    applySettings(merged.settings);
+                    lsSet(SETTINGS_KEY, Object.assign({}, currentSettings(), { ts: settingsTs }));
+                } else if (state.routeKey.indexOf('route_') === 0 && !savedRoutes.some(r => 'route_' + r.id === state.routeKey)) {
+                    selectPresetRoute('msu_kk_home', PRESETS.msu_kk_home.km, PRESETS.msu_kk_home.title);
+                }
+
+                const out = localBlob();
+                if (!j.data || blobSig(out) !== blobSig(j.data)) {
+                    const pr = await fetch(cfg.url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ code: cfg.code, data: out })
+                    });
+                    const pj = await pr.json();
+                    if (!pj || !pj.ok) throw new Error((pj && pj.error) || 'push failed');
+                }
+                const d = new Date();
+                setSyncStatus('ซิงก์แล้ว ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'), 'ok');
+                const m = document.getElementById('syncMsg');
+                if (m) m.textContent = '';
+            } catch (e) {
+                setSyncStatus('ซิงก์ไม่สำเร็จ (ข้อมูลยังอยู่ในเครื่อง)', 'err');
+            } finally {
+                syncing = false;
+                if (resyncQueued) { resyncQueued = false; schedulePush(); }
+            }
+        }
+
+        function saveSyncCfg() {
+            const url = document.getElementById('syncUrl').value.trim();
+            const code = document.getElementById('syncCode').value.trim();
+            const msg = document.getElementById('syncMsg');
+            if (!/^https:\/\/script\.google\.com\/macros\/s\/[^\s]+\/exec$/.test(url)) {
+                msg.textContent = 'ลิงก์ต้องเป็น URL ของเว็บแอป Apps Script ที่ลงท้ายด้วย /exec';
+                return;
+            }
+            if (code.length < 6) { msg.textContent = 'รหัสซิงก์ต้องยาวอย่างน้อย 6 ตัวอักษร'; return; }
+            msg.textContent = '';
+            lsSet(SYNC_CFG_KEY, { url, code });
+            syncNow();
+        }
+
+        function clearSyncCfg() {
+            try { localStorage.removeItem(SYNC_CFG_KEY); } catch (e) { /* ไม่เป็นไร */ }
+            document.getElementById('syncUrl').value = DEFAULT_SYNC_URL;
+            document.getElementById('syncCode').value = '';
+            setSyncStatus('ยังไม่ได้ตั้งค่า');
+        }
+
+        function copyGasCode() {
+            const btn = document.getElementById('copyGasBtn');
+            const done = () => { btn.textContent = 'คัดลอกแล้ว'; setTimeout(() => { btn.textContent = 'คัดลอกโค้ด'; }, 1800); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(done, () => {});
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = APPS_SCRIPT_CODE;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); done(); } catch (e) { /* ผู้ใช้เลือกคัดลอกเองได้ */ }
+                ta.remove();
+            }
+        }
+
+        function initSyncUi() {
+            const cfg = getSyncCfg();
+            document.getElementById('syncUrl').value = cfg.url;
+            document.getElementById('syncCode').value = cfg.code;
+            document.getElementById('gasCode').textContent = APPS_SCRIPT_CODE;
+            setSyncStatus(cfg.url && cfg.code ? 'พร้อมซิงก์' : 'ยังไม่ได้ตั้งค่า');
+        }
+
+        // Initialize on load
+        window.onload = function () {
+            loadRoutes();
+            renderSavedRoutes();
+            const saved = lsGet(SETTINGS_KEY, null);
+            if (saved) {
+                settingsTs = Number(saved.ts) || 0;
+                applySettings(saved);
+            } else {
+                state.routeLegs = PRESET_LEGS.msu_kk_home;
+                updateAllCalculations();
+            }
+            setupStepTracking();
+            lastSnapshot = JSON.stringify(currentSettings());
+            appReady = true;
+
+            initSyncUi();
+            syncNow();
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow(); });
+            window.addEventListener('online', syncNow);
+
+            if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+                navigator.serviceWorker.register('sw.js').catch(() => { /* ไม่รองรับ ก็ใช้งานปกติ */ });
+            }
+        };
+    </script>
+</body>
+</html>
